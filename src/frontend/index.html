@@ -1,0 +1,1936 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🍃 Naruto 5e Database — Painel Tático RPG</title>
+  <!-- Assets locais para funcionamento 100% offline e ultrarrápido -->
+  <script src="/static/tailwind.js"></script>
+  <script src="/static/vue.global.prod.js"></script>
+  <style>
+    [v-cloak] { display: none; }
+    /* Scrollbar densa e moderna */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+  <div id="app" v-cloak class="flex flex-col h-screen">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shrink-0 shadow-lg">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🍃</span>
+        <div>
+          <h1 class="font-bold text-lg leading-tight tracking-wide text-amber-400">NARUTO 5e DATABASE</h1>
+          <p class="text-xs text-slate-400">Painel Tático & Compêndio Mecânico Shinobi (Crunch Only)</p>
+        </div>
+      </div>
+
+      <!-- Main Tabs -->
+      <nav class="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs font-semibold">
+        <button 
+          v-for="tab in tabs" 
+          :key="tab.id"
+          @click="currentTab = tab.id"
+          :class="currentTab === tab.id ? 'bg-amber-500 text-slate-950 shadow-md font-bold' : 'text-slate-300 hover:text-white hover:bg-slate-800'"
+          class="px-3 py-1.5 rounded transition-all flex items-center gap-1.5">
+          <span>{{ tab.icon }}</span>
+          <span>{{ tab.label }}</span>
+          <span v-if="counts[tab.countKey]" class="bg-black/30 px-1.5 py-0.5 rounded text-[10px]">{{ counts[tab.countKey] }}</span>
+        </button>
+      </nav>
+
+      <!-- Quick Actions -->
+      <div class="flex items-center gap-2 text-xs">
+        <a href="/docs" target="_blank" class="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+          📘 Swagger /docs
+        </a>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <div class="flex flex-1 overflow-hidden">
+
+      <!-- ============================================================== -->
+      <!-- TAB 1: JUTSUS (Filtros Massivos e Tabela Densa)               -->
+      <!-- ============================================================== -->
+      <div v-show="currentTab === 'jutsus'" class="flex w-full h-full overflow-hidden">
+        
+        <!-- Sidebar de Filtros -->
+        <aside class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 overflow-y-auto p-3 text-xs gap-3">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+            <span class="font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1">
+              🎛️ Filtros Massivos
+            </span>
+            <button 
+              @click="resetJutsuFilters"
+              class="text-rose-400 hover:text-rose-300 font-medium hover:underline text-[11px]">
+              Limpar Filtros
+            </button>
+          </div>
+
+          <!-- Busca Textual -->
+          <div>
+            <label class="block text-slate-400 mb-1 font-medium">🔍 Busca em Nome / Descrição</label>
+            <input 
+              v-model="jFilters.q" 
+              @input="debouncedFetchJutsus"
+              type="text" 
+              placeholder="Ex: Rasengan, Dragão, Clone..." 
+              class="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500">
+          </div>
+
+          <!-- Ranks -->
+          <div>
+            <label class="block text-slate-400 mb-1 font-medium">Rank do Jutsu</label>
+            <div class="grid grid-cols-3 gap-1">
+              <button 
+                v-for="r in ['Rank-E', 'Rank-D', 'Rank-C', 'Rank-B', 'Rank-A', 'Rank-S']" 
+                :key="r"
+                @click="toggleFilterList('ranks', r)"
+                :class="jFilters.ranks.includes(r) ? 'bg-amber-500 text-slate-950 font-bold border-amber-400' : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'"
+                class="py-1 px-1.5 text-center rounded border text-[11px] transition">
+                {{ r.replace('Rank-', '') }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Classificação -->
+          <div>
+            <label class="block text-slate-400 mb-1 font-medium">Classificação</label>
+            <div class="grid grid-cols-2 gap-1">
+              <button 
+                v-for="c in ['Ninjutsu', 'Taijutsu', 'Genjutsu', 'Bukijutsu']" 
+                :key="c"
+                @click="toggleFilterList('classificacoes', c)"
+                :class="jFilters.classificacoes.includes(c) ? 'bg-indigo-600 text-white font-bold border-indigo-500' : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'"
+                class="py-1 px-1.5 text-center rounded border text-[11px] transition">
+                {{ c }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Natureza Elemental -->
+          <div>
+            <label class="block text-slate-400 mb-1 font-medium">Natureza de Chakra</label>
+            <div class="flex flex-wrap gap-1">
+              <button 
+                v-for="nat in ['Fogo', 'Vento', 'Relâmpago', 'Terra', 'Água', 'Médico', 'Não Elemental']" 
+                :key="nat"
+                @click="toggleFilterList('naturezas', nat)"
+                :class="jFilters.naturezas.includes(nat) ? 'bg-orange-600 text-white font-bold border-orange-500' : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'"
+                class="py-0.5 px-2 rounded-full border text-[10px] transition">
+                {{ nat }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Clã & Exclusividade -->
+          <div>
+            <label class="block text-slate-400 mb-1 font-medium">Vínculo com Clã</label>
+            <select 
+              v-model="jFilters.cla" 
+              @change="fetchJutsus"
+              class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-amber-500 mb-1.5">
+              <option value="">Todos os Clãs (45 opções)</option>
+              <option v-for="c in meta.jutsus?.clans" :key="c" :value="c">{{ c }}</option>
+            </select>
+            <div class="flex gap-2">
+              <label class="flex items-center gap-1 cursor-pointer text-slate-400 text-[11px]">
+                <input type="radio" v-model="jFilters.exclusividade" value="todos" @change="fetchJutsus" class="accent-amber-500"> Todos
+              </label>
+              <label class="flex items-center gap-1 cursor-pointer text-slate-400 text-[11px]">
+                <input type="radio" v-model="jFilters.exclusividade" value="apenas_cla" @change="fetchJutsus" class="accent-amber-500"> Apenas Clã
+              </label>
+              <label class="flex items-center gap-1 cursor-pointer text-slate-400 text-[11px]">
+                <input type="radio" v-model="jFilters.exclusividade" value="apenas_gerais" @change="fetchJutsus" class="accent-amber-500"> Sem Clã
+              </label>
+            </div>
+          </div>
+
+          <!-- Custo de Chakra Range -->
+          <div>
+            <div class="flex justify-between text-slate-400 mb-1 font-medium">
+              <span>Custo de Chakra:</span>
+              <span class="text-amber-400 font-bold">{{ jFilters.minChakra }} a {{ jFilters.maxChakra }} pts</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <input 
+                type="number" min="0" max="50" v-model.number="jFilters.minChakra" @change="fetchJutsus"
+                class="w-16 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-center text-xs">
+              <span class="text-slate-600">—</span>
+              <input 
+                type="number" min="0" max="50" v-model.number="jFilters.maxChakra" @change="fetchJutsus"
+                class="w-16 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-center text-xs">
+            </div>
+            <!-- Presets rápidos -->
+            <div class="flex gap-1 mt-1.5">
+              <button @click="setChakraPreset(0, 0)" class="bg-slate-950 hover:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] border border-slate-800">0 Ch</button>
+              <button @click="setChakraPreset(1, 5)" class="bg-slate-950 hover:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] border border-slate-800">1-5</button>
+              <button @click="setChakraPreset(6, 10)" class="bg-slate-950 hover:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] border border-slate-800">6-10</button>
+              <button @click="setChakraPreset(11, 40)" class="bg-slate-950 hover:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] border border-slate-800">11+</button>
+              <button @click="setChakraPreset(0, 40)" class="bg-slate-950 hover:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] border border-slate-800">Todos</button>
+            </div>
+          </div>
+
+          <!-- Ação & Salvaguarda -->
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-slate-400 mb-1 font-medium">Tempo de Ação</label>
+              <select v-model="jFilters.tempo" @change="fetchJutsus" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-slate-200">
+                <option value="">Qualquer</option>
+                <option value="1 Ação">1 Ação</option>
+                <option value="1 Ação Bônus">Ação Bônus</option>
+                <option value="Reação">Reação</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1 font-medium">Salvaguarda</label>
+              <select v-model="jFilters.salvaguarda" @change="fetchJutsus" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-slate-200">
+                <option value="">Qualquer</option>
+                <option v-for="s in ['Força', 'Destreza', 'Constituição', 'Inteligência', 'Sabedoria', 'Carisma']" :key="s" :value="s">{{ s.slice(0, 3).toUpperCase() }}</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Dano & Condição -->
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-slate-400 mb-1 font-medium">Tipo de Dano</label>
+              <select v-model="jFilters.danoTipo" @change="fetchJutsus" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-slate-200">
+                <option value="">Qualquer</option>
+                <option v-for="d in ['Fogo', 'Cortante', 'Perfuração', 'Concussão', 'Vento', 'Relâmpago', 'Terra', 'Veneno', 'Necrótico', 'Psíquico']" :key="d" :value="d">{{ d }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1 font-medium">Condição Aplicada</label>
+              <select v-model="jFilters.condicao" @change="fetchJutsus" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-slate-200">
+                <option value="">Qualquer</option>
+                <option v-for="c in meta.condicoes" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Palavras-chave / Tags -->
+          <div>
+            <label class="block text-slate-400 mb-1 font-medium">Palavra-Chave (Tag)</label>
+            <select v-model="jFilters.palavraChave" @change="fetchJutsus" class="w-full bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-slate-200">
+              <option value="">Todas</option>
+              <option value="Conflito">Conflito (Clash)</option>
+              <option value="Fuinjutsu">Fuinjutsu</option>
+              <option value="Hijutsu">Hijutsu</option>
+              <option value="Kinjutsu">Kinjutsu</option>
+              <option value="Invocação">Invocação</option>
+              <option value="Clone">Clone</option>
+            </select>
+          </div>
+
+          <!-- Toggles Especiais -->
+          <div class="flex flex-col gap-1.5 pt-1 border-t border-slate-800">
+            <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+              <input type="checkbox" v-model="jFilters.possuiVantagem" @change="fetchJutsus" class="accent-amber-500 rounded">
+              <span>⚡ Concede Vantagem / Desvantagem</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+              <input type="checkbox" v-model="jFilters.possuiUpcast" @change="fetchJutsus" class="accent-amber-500 rounded">
+              <span>📈 Possui Escalonamento (Upcast)</span>
+            </label>
+          </div>
+
+        </aside>
+
+        <!-- Área de Resultados (Tabela Densa) -->
+        <main class="flex-1 flex flex-col overflow-hidden bg-slate-950">
+          
+          <!-- Subheader de Resultados & Ordenação -->
+          <div class="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between shrink-0 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="text-slate-400">Resultados encontrados:</span>
+              <span class="font-bold text-amber-400 text-sm">{{ jutsuData.total }}</span>
+              <span v-if="jutsuLoading" class="text-amber-500 animate-spin">⌛</span>
+            </div>
+
+            <!-- Ordenação e Visualização -->
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-1.5">
+                <span class="text-slate-400">Ordenar por:</span>
+                <select v-model="jFilters.sortBy" @change="fetchJutsus" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200">
+                  <option value="rank_asc">Rank (E -> S)</option>
+                  <option value="rank_desc">Rank (S -> E)</option>
+                  <option value="chakra_asc">Chakra (Menor -> Maior)</option>
+                  <option value="chakra_desc">Chakra (Maior -> Menor)</option>
+                  <option value="nome_asc">Nome (A -> Z)</option>
+                </select>
+              </div>
+
+              <!-- Alternador de Visualização -->
+              <div class="flex border border-slate-700 rounded overflow-hidden">
+                <button 
+                  @click="viewMode = 'table'" 
+                  :class="viewMode === 'table' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-950 text-slate-400'"
+                  class="px-2.5 py-1">Tabela</button>
+                <button 
+                  @click="viewMode = 'cards'" 
+                  :class="viewMode === 'cards' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-950 text-slate-400'"
+                  class="px-2.5 py-1">Cartões</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabela de Jutsus -->
+          <div v-if="viewMode === 'table'" class="flex-1 overflow-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-900 sticky top-0 z-10 text-slate-400 border-b border-slate-800 font-semibold uppercase text-[11px]">
+                <tr>
+                  <th class="p-2 w-16 text-center">Rank</th>
+                  <th class="p-2">Nome do Jutsu</th>
+                  <th class="p-2">Natureza / Estilo</th>
+                  <th class="p-2">Clã</th>
+                  <th class="p-2 text-center">Chakra</th>
+                  <th class="p-2">Ação</th>
+                  <th class="p-2">Alcance</th>
+                  <th class="p-2">Dano</th>
+                  <th class="p-2">Save</th>
+                  <th class="p-2 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60 font-mono text-[11px]">
+                <tr 
+                  v-for="j in jutsuData.items" 
+                  :key="j.id"
+                  @click="selectJutsu(j)"
+                  class="hover:bg-slate-800/50 cursor-pointer transition"
+                  :class="selectedJutsu?.id === j.id ? 'bg-amber-500/10 border-l-2 border-amber-500' : ''">
+                  
+                  <!-- Rank Badge -->
+                  <td class="p-2 text-center">
+                    <span 
+                      :class="getRankBadgeClass(j.rank)"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-bold">
+                      {{ j.rank.replace('Rank-', '') }}
+                    </span>
+                  </td>
+
+                  <!-- Nome -->
+                  <td class="p-2 font-sans font-semibold text-slate-200">
+                    {{ j.nome }}
+                    <span v-if="j.exclusivo_cla" class="text-rose-400 text-[9px] bg-rose-950/60 border border-rose-800 px-1 rounded ml-1">CLÃ</span>
+                  </td>
+
+                  <!-- Natureza -->
+                  <td class="p-2 font-sans text-slate-300">
+                    <span :class="getNatureColor(j.natureza_estilo)">{{ j.natureza_estilo || '—' }}</span>
+                  </td>
+
+                  <!-- Clã -->
+                  <td class="p-2 font-sans text-slate-400">{{ j.cla || '—' }}</td>
+
+                  <!-- Chakra -->
+                  <td class="p-2 text-center text-amber-400 font-bold">{{ j.custo_chakra }}</td>
+
+                  <!-- Ação -->
+                  <td class="p-2 font-sans text-slate-300">{{ j.tempo_conjuracao }}</td>
+
+                  <!-- Alcance -->
+                  <td class="p-2 font-sans text-slate-400 truncate max-w-[120px]">{{ j.alcance }}</td>
+
+                  <!-- Dano -->
+                  <td class="p-2 font-sans text-rose-400">
+                    <span v-if="j.dano_formula">{{ j.dano_formula }} {{ j.dano_tipo }}</span>
+                    <span v-else class="text-slate-600">—</span>
+                  </td>
+
+                  <!-- Salvaguarda -->
+                  <td class="p-2 font-sans text-cyan-400">{{ j.salvaguarda || '—' }}</td>
+
+                  <!-- Detalhes button -->
+                  <td class="p-2 text-center">
+                    <button 
+                      @click.stop="openJutsuModal(j)" 
+                      class="px-2 py-0.5 bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-300 rounded text-[10px] transition">
+                      Ver
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Modo Cartões -->
+          <div v-else class="flex-1 overflow-auto p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div 
+              v-for="j in jutsuData.items" 
+              :key="j.id"
+              @click="openJutsuModal(j)"
+              class="bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-lg p-3 cursor-pointer flex flex-col justify-between transition shadow">
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <span :class="getRankBadgeClass(j.rank)" class="px-1.5 py-0.5 rounded text-[10px] font-bold">
+                    {{ j.rank }}
+                  </span>
+                  <span class="text-amber-400 font-bold text-xs">{{ j.custo_chakra }} Chakra</span>
+                </div>
+                <h3 class="font-bold text-sm text-slate-100 mb-1 leading-snug">{{ j.nome }}</h3>
+                <div class="text-xs text-slate-400 flex flex-wrap gap-2 mb-2">
+                  <span>{{ j.tempo_conjuracao }}</span>
+                  <span>•</span>
+                  <span>{{ j.alcance }}</span>
+                  <span v-if="j.cla" class="text-rose-400">• {{ j.cla }}</span>
+                </div>
+                <p class="text-xs text-slate-300 line-clamp-3 mb-2 font-sans">{{ j.efeito_mecanico }}</p>
+              </div>
+              <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                <span class="text-rose-400" v-if="j.dano_formula">{{ j.dano_formula }} {{ j.dano_tipo }}</span>
+                <span class="text-cyan-400" v-if="j.salvaguarda">Save: {{ j.salvaguarda }}</span>
+                <span class="text-slate-500 ml-auto">p.{{ j.pagina }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Paginação Simples -->
+          <div class="bg-slate-900 border-t border-slate-800 px-4 py-2 flex items-center justify-between shrink-0 text-xs">
+            <span class="text-slate-400">
+              Página {{ Math.floor(jFilters.offset / jFilters.limit) + 1 }} de {{ Math.ceil(jutsuData.total / jFilters.limit) || 1 }}
+            </span>
+            <div class="flex gap-2">
+              <button 
+                :disabled="jFilters.offset === 0"
+                @click="prevJutsuPage"
+                class="px-3 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded text-slate-200">
+                ◀ Anterior
+              </button>
+              <button 
+                :disabled="jFilters.offset + jFilters.limit >= jutsuData.total"
+                @click="nextJutsuPage"
+                class="px-3 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 rounded text-slate-200">
+                Próxima ▶
+              </button>
+            </div>
+          </div>
+
+        </main>
+
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TAB 2: CLÃS & LINHAGENS                                        -->
+      <!-- ============================================================== -->
+      <div v-show="currentTab === 'clans'" class="flex-1 flex overflow-hidden">
+        <!-- Lista de Clãs -->
+        <div class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col p-3 gap-2 overflow-y-auto shrink-0">
+          <input 
+            v-model="clanSearch" 
+            type="text" 
+            placeholder="🔍 Filtrar clã..." 
+            class="bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-100 mb-1">
+          <div class="divide-y divide-slate-800">
+            <button 
+              v-for="c in filteredClans" 
+              :key="c.id"
+              @click="loadClanDetail(c.nome)"
+              :class="activeClan?.cla?.nome === c.nome ? 'bg-amber-500 text-slate-950 font-bold' : 'hover:bg-slate-800 text-slate-200'"
+              class="w-full text-left px-2.5 py-2 text-xs rounded transition flex justify-between items-center">
+              <span>{{ c.nome }}</span>
+              <span class="text-[10px] opacity-75">{{ c.deslocamento }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Detalhes do Clã -->
+        <div class="flex-1 p-6 overflow-y-auto" v-if="activeClan">
+          <div class="max-w-4xl mx-auto space-y-6">
+            <div class="flex justify-between items-start border-b border-slate-800 pb-4">
+              <div>
+                <h2 class="text-2xl font-bold text-amber-400">CLÃ {{ activeClan.cla.nome.toUpperCase() }}</h2>
+                <p class="text-xs text-slate-400">Estudos da Tsunade (Página {{ activeClan.cla.pagina }})</p>
+              </div>
+              <div class="text-right">
+                <span class="text-xs text-slate-400 block">Deslocamento Base</span>
+                <span class="text-sm font-bold text-slate-100">{{ activeClan.cla.deslocamento }}</span>
+              </div>
+            </div>
+
+            <!-- Bônus de Atributos & Perícias -->
+            <div class="grid grid-cols-2 gap-4">
+              <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg">
+                <h4 class="text-xs font-bold text-amber-400 uppercase mb-1">⚡ Aumento no Valor de Habilidade</h4>
+                <p class="text-sm text-slate-200">{{ activeClan.cla.aumento_atributos_raw }}</p>
+              </div>
+              <div class="bg-slate-900 border border-slate-800 p-3 rounded-lg">
+                <h4 class="text-xs font-bold text-amber-400 uppercase mb-1">🎯 Perícias Concedidas</h4>
+                <p class="text-sm text-slate-200">{{ activeClan.cla.pericias.join(', ') || 'Nenhuma perícia específica' }}</p>
+              </div>
+            </div>
+
+            <!-- Recursos Mecânicos -->
+            <div>
+              <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider mb-3">🛡️ Recursos Mecânicos do Clã ({{ activeClan.cla.recursos.length }})</h3>
+              <div class="space-y-3">
+                <div v-for="f in activeClan.cla.recursos" :key="f.nome" class="bg-slate-900 border border-slate-800 p-3 rounded-lg">
+                  <div class="flex justify-between items-center mb-1">
+                    <h4 class="font-bold text-slate-100 text-xs">{{ f.nome }} (Nível {{ f.nivel || 1 }})</h4>
+                    <span v-if="f.usos" class="text-[10px] bg-slate-800 text-amber-400 px-2 py-0.5 rounded">{{ f.usos }}</span>
+                  </div>
+                  <p class="text-xs text-slate-300">{{ f.descricao }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Jutsus Exclusivos -->
+            <div v-if="activeClan.jutsus_exclusivos.length > 0">
+              <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider mb-3">🔥 Técnicas Exclusivas do Clã ({{ activeClan.jutsus_exclusivos.length }})</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div 
+                  v-for="j in activeClan.jutsus_exclusivos" 
+                  :key="j.id"
+                  @click="openJutsuModal(j)"
+                  class="bg-slate-900 hover:border-amber-500/50 border border-slate-800 p-2.5 rounded cursor-pointer transition">
+                  <div class="flex justify-between items-center mb-1">
+                    <span class="text-xs font-bold text-slate-200">{{ j.nome }}</span>
+                    <span class="text-[10px] text-amber-400 font-bold">{{ j.rank }} ({{ j.custo_chakra }} Ch)</span>
+                  </div>
+                  <p class="text-xs text-slate-400 line-clamp-2">{{ j.efeito_mecanico }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Linhagens Latentes -->
+            <div v-if="activeClan.linhagens_latentes.length > 0">
+              <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider mb-3">🩸 Habilidades de Linhagem Latente ({{ activeClan.linhagens_latentes.length }})</h3>
+              <div class="space-y-2">
+                <div v-for="l in activeClan.linhagens_latentes" :key="l.nome_habilidade" class="bg-slate-900 border border-slate-800 p-3 rounded">
+                  <div class="flex justify-between items-center mb-1">
+                    <span class="text-xs font-bold text-rose-400">{{ l.nome_habilidade }}</span>
+                    <span class="text-[10px] bg-rose-950 text-rose-300 border border-rose-800 px-2 py-0.5 rounded font-bold">Custo: {{ l.custo_pontos }} pts</span>
+                  </div>
+                  <p v-if="l.pre_requisito" class="text-[11px] text-slate-400 mb-1">Pré-requisito: {{ l.pre_requisito }}</p>
+                  <p class="text-xs text-slate-300">{{ l.descricao }}</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TAB 3: CLASSES & ARQUÉTIPOS                                    -->
+      <!-- ============================================================== -->
+      <div v-show="currentTab === 'classes'" class="flex-1 flex overflow-hidden">
+        <!-- Lista de Classes -->
+        <div class="w-72 bg-slate-900 border-r border-slate-800 flex flex-col p-3 gap-2 overflow-y-auto shrink-0">
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">11 Classes Shinobi</span>
+          <button 
+            v-for="c in classesList" 
+            :key="c.id"
+            @click="loadClassDetail(c.nome)"
+            :class="activeClass?.classe?.nome === c.nome ? 'bg-amber-500 text-slate-950 font-bold' : 'hover:bg-slate-800 text-slate-200'"
+            class="w-full text-left px-2.5 py-2 text-xs rounded transition flex justify-between items-center">
+            <span>{{ c.nome }}</span>
+            <span class="text-[10px] opacity-75 font-mono">{{ c.dado_vida }}</span>
+          </button>
+        </div>
+
+        <!-- Detalhes da Classe Selecionada -->
+        <div class="flex-1 p-6 overflow-y-auto" v-if="activeClass">
+          <div class="max-w-5xl mx-auto space-y-6">
+            <div class="border-b border-slate-800 pb-4 flex justify-between items-start">
+              <div>
+                <h2 class="text-2xl font-bold text-amber-400">{{ activeClass.classe.nome.toUpperCase() }}</h2>
+                <p class="text-xs text-slate-400">{{ activeClass.classe.nome_en }} • Livro: Classes.pdf (p.{{ activeClass.classe.pagina_inicio }})</p>
+              </div>
+              <div class="flex gap-4 text-xs font-mono text-center">
+                <div class="bg-slate-900 border border-slate-800 p-2 rounded">
+                  <span class="block text-slate-400 text-[10px]">Dado Vida</span>
+                  <span class="text-amber-400 font-bold text-sm">{{ activeClass.classe.dado_vida }}</span>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 p-2 rounded">
+                  <span class="block text-slate-400 text-[10px]">Dado Chakra</span>
+                  <span class="text-cyan-400 font-bold text-sm">{{ activeClass.classe.dado_chakra }}</span>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 p-2 rounded">
+                  <span class="block text-slate-400 text-[10px]">Conjuração</span>
+                  <span class="text-slate-200 font-bold text-sm">{{ activeClass.classe.tipo_conjurador }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tabela de Progressão de 1 a 20 -->
+            <div>
+              <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider mb-2">📊 Tabela de Progressão (Níveis 1 a 20)</h3>
+              <div class="border border-slate-800 rounded-lg overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                  <thead class="bg-slate-900 text-slate-400 font-semibold uppercase text-[10px]">
+                    <tr>
+                      <th class="p-2 text-center w-12">Nível</th>
+                      <th class="p-2 text-center w-14">PB</th>
+                      <th class="p-2">Características Adquiridas</th>
+                      <th class="p-2 text-center w-20">Jutsus</th>
+                      <th class="p-2 text-center w-20">Rank Máx</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-800/80 font-mono text-[11px]">
+                    <tr v-for="r in activeClass.classe.tabela_progressao" :key="r.nivel" class="hover:bg-slate-800/40">
+                      <td class="p-2 text-center font-bold text-amber-400">{{ r.nivel }}º</td>
+                      <td class="p-2 text-center text-slate-300">{{ r.bonus_proficiencia || '+2' }}</td>
+                      <td class="p-2 font-sans text-slate-200">{{ r.recursos || '—' }}</td>
+                      <td class="p-2 text-center text-cyan-400">{{ r.jutsus_conhecidos || '—' }}</td>
+                      <td class="p-2 text-center text-slate-400">{{ r.rank_max || '—' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Subclasses / Arquétipos -->
+            <div>
+              <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider mb-3">🔮 Arquétipos / Subclasses ({{ activeClass.arquetipos.length }})</h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div v-for="a in activeClass.arquetipos" :key="a.nome" class="bg-slate-900 border border-slate-800 p-3 rounded-lg">
+                  <div class="flex justify-between items-center mb-1">
+                    <h4 class="font-bold text-amber-400 text-xs">{{ a.nome }}</h4>
+                    <span class="text-[10px] text-slate-400">Nível {{ a.nivel_obtencao }}</span>
+                  </div>
+                  <p class="text-xs text-slate-300 mb-2">{{ a.descricao_mecanica }}</p>
+                  <div class="space-y-1.5 pl-2 border-l border-amber-500/40" v-if="a.caracteristicas">
+                    <div v-for="f in a.caracteristicas" :key="f.nome" class="text-[11px]">
+                      <span class="font-bold text-slate-200">{{ f.nome }}:</span>
+                      <span class="text-slate-400"> {{ f.descricao }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TAB 4: EQUIPAMENTOS & FUINJUTSU                               -->
+      <!-- ============================================================== -->
+      <div v-show="currentTab === 'equipment'" class="flex-1 flex flex-col p-4 overflow-hidden">
+        <!-- Subabas de Equipamento -->
+        <div class="flex items-center gap-2 mb-3 shrink-0">
+          <button 
+            @click="eqSubTab = 'weapons'"
+            :class="eqSubTab === 'weapons' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-900 text-slate-300'"
+            class="px-3 py-1.5 rounded text-xs transition">
+            🗡️ Armas ({{ counts.weapons }})
+          </button>
+          <button 
+            @click="eqSubTab = 'armors'"
+            :class="eqSubTab === 'armors' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-900 text-slate-300'"
+            class="px-3 py-1.5 rounded text-xs transition">
+            🛡️ Armaduras & Escudos ({{ counts.armors }})
+          </button>
+          <button 
+            @click="eqSubTab = 'fuinjutsu'"
+            :class="eqSubTab === 'fuinjutsu' ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-900 text-slate-300'"
+            class="px-3 py-1.5 rounded text-xs transition">
+            📜 Selos de Fuinjutsu ({{ counts.fuinjutsu_seals }})
+          </button>
+        </div>
+
+        <!-- Conteúdo Armas -->
+        <div v-if="eqSubTab === 'weapons'" class="flex-1 overflow-auto border border-slate-800 rounded-lg">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-slate-900 sticky top-0 text-slate-400 font-semibold uppercase text-[11px]">
+              <tr>
+                <th class="p-2">Nome</th>
+                <th class="p-2">Categoria</th>
+                <th class="p-2">Custo</th>
+                <th class="p-2">Dano</th>
+                <th class="p-2">Grupo</th>
+                <th class="p-2 text-center">Volume</th>
+                <th class="p-2">Propriedades</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/80 font-mono text-[11px]">
+              <tr v-for="w in weaponsList" :key="w.id" class="hover:bg-slate-800/50">
+                <td class="p-2 font-bold font-sans text-slate-200">{{ w.nome }}</td>
+                <td class="p-2 font-sans text-slate-400">{{ w.categoria }}</td>
+                <td class="p-2 text-amber-400">{{ w.custo_ryo }}</td>
+                <td class="p-2 text-rose-400 font-bold">{{ w.dano }}</td>
+                <td class="p-2 font-sans text-slate-300">{{ w.grupo_arma }}</td>
+                <td class="p-2 text-center text-slate-400">{{ w.volume }}</td>
+                <td class="p-2 font-sans text-slate-300">{{ w.propriedades }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Conteúdo Armaduras -->
+        <div v-if="eqSubTab === 'armors'" class="flex-1 overflow-auto border border-slate-800 rounded-lg">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-slate-900 sticky top-0 text-slate-400 font-semibold uppercase text-[11px]">
+              <tr>
+                <th class="p-2">Nome</th>
+                <th class="p-2">Tipo</th>
+                <th class="p-2 text-center">Bônus CA</th>
+                <th class="p-2 text-center">Des Máx</th>
+                <th class="p-2">Custo</th>
+                <th class="p-2 text-center">Volume</th>
+                <th class="p-2">Efeito Especial</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/80 font-mono text-[11px]">
+              <tr v-for="a in armorsList" :key="a.id" class="hover:bg-slate-800/50">
+                <td class="p-2 font-bold font-sans text-slate-200">{{ a.nome }}</td>
+                <td class="p-2 font-sans text-slate-400">{{ a.tipo }}</td>
+                <td class="p-2 text-center text-cyan-400 font-bold">{{ a.bonus_ca }}</td>
+                <td class="p-2 text-center text-slate-300">{{ a.bonus_des_max }}</td>
+                <td class="p-2 text-amber-400">{{ a.custo_ryo }}</td>
+                <td class="p-2 text-center text-slate-400">{{ a.volume }}</td>
+                <td class="p-2 font-sans text-slate-300">{{ a.efeito_especial || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Conteúdo Selos de Fuinjutsu -->
+        <div v-if="eqSubTab === 'fuinjutsu'" class="flex-1 overflow-auto border border-slate-800 rounded-lg">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-slate-900 sticky top-0 text-slate-400 font-semibold uppercase text-[11px]">
+              <tr>
+                <th class="p-2 text-center w-16">Rank</th>
+                <th class="p-2">Nome do Selo</th>
+                <th class="p-2">Item</th>
+                <th class="p-2">Custo Ryo</th>
+                <th class="p-2">Efeito Mecânico</th>
+                <th class="p-2 text-center">Pág</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/80 font-mono text-[11px]">
+              <tr v-for="s in fuinjutsuList" :key="s.id" class="hover:bg-slate-800/50">
+                <td class="p-2 text-center">
+                  <span :class="getRankBadgeClass(s.rank)" class="px-1.5 py-0.5 rounded text-[10px] font-bold">{{ s.rank }}</span>
+                </td>
+                <td class="p-2 font-bold font-sans text-slate-200">{{ s.nome }}</td>
+                <td class="p-2 font-sans text-slate-300">{{ s.tipo_item }}</td>
+                <td class="p-2 text-amber-400 font-bold">{{ s.custo_ryo }} Ryo</td>
+                <td class="p-2 font-sans text-slate-300 text-[11px] leading-relaxed">{{ s.efeito_mecanico }}</td>
+                <td class="p-2 text-center text-slate-500">p.{{ s.pagina }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TAB 5: CONDIÇÕES & REGRAS                                      -->
+      <!-- ============================================================== -->
+      <div v-show="currentTab === 'rules'" class="flex-1 p-6 overflow-y-auto">
+        <div class="max-w-5xl mx-auto space-y-6">
+          <h2 class="text-xl font-bold text-amber-400 border-b border-slate-800 pb-2">⚠️ CONDIÇÕES DE STATUS & REGRAS NUCLEARES</h2>
+
+          <!-- Condições -->
+          <div>
+            <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider mb-3">31 Condições de Status</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div v-for="c in conditionsList" :key="c.nome" class="bg-slate-900 border border-slate-800 p-3 rounded-lg">
+                <div class="flex justify-between items-center mb-1">
+                  <h4 class="font-bold text-slate-100 text-xs">{{ c.nome }}</h4>
+                  <span class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-amber-400">{{ c.categoria }} (p.{{ c.pagina }})</span>
+                </div>
+                <p class="text-xs text-slate-300 leading-relaxed">{{ c.descricao_mecanica }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Regras Centrais -->
+          <div>
+            <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider mb-3">⚔️ Regras de Combate Shinobi</h3>
+            <div class="space-y-3">
+              <div v-for="r in combatRulesList" :key="r.chave" class="bg-slate-900 border border-slate-800 p-4 rounded-lg">
+                <h4 class="font-bold text-amber-400 text-sm mb-1">{{ r.titulo }} (p.{{ r.pagina }})</h4>
+                <p class="text-xs text-slate-300 leading-relaxed mb-2">{{ r.descricao_mecanica }}</p>
+                <div v-if="r.dados_estruturados" class="bg-slate-950 p-2.5 rounded text-xs font-mono text-slate-400">
+                  <pre class="whitespace-pre-wrap">{{ JSON.stringify(r.dados_estruturados, null, 2) }}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TAB 6: CALCULADORA DE CLASH (Regra p. 170)                    -->
+      <!-- ============================================================== -->
+      <div v-show="currentTab === 'clash'" class="flex-1 p-6 overflow-y-auto flex justify-center items-start">
+        <div class="max-w-2xl w-full bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-2xl space-y-6">
+          <div class="text-center border-b border-slate-800 pb-3">
+            <h2 class="text-2xl font-bold text-amber-400">⚔️ SIMULADOR DE CONFLITO DE JUTSU (CLASH)</h2>
+            <p class="text-xs text-slate-400 mt-1">Mecânica oficial resistida e Roda de Superioridade Elemental (p. 170)</p>
+          </div>
+
+          <!-- Combatente A e B -->
+          <div class="grid grid-cols-2 gap-4">
+            <!-- Combatente A -->
+            <div class="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-3">
+              <h3 class="font-bold text-xs text-amber-400 uppercase">Combatente A</h3>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Elemento:</label>
+                <select v-model="clashForm.elemento_a" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs">
+                  <option value="">Não Elemental / Outro</option>
+                  <option value="Fogo">Fogo (Katon)</option>
+                  <option value="Vento">Vento (Futon)</option>
+                  <option value="Relâmpago">Relâmpago (Raiton)</option>
+                  <option value="Terra">Terra (Doton)</option>
+                  <option value="Água">Água (Suiton)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Rank da Técnica:</label>
+                <select v-model="clashForm.rank_a" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs">
+                  <option value="Rank-E">Rank-E (+0)</option>
+                  <option value="Rank-D">Rank-D (+1)</option>
+                  <option value="Rank-C">Rank-C (+2)</option>
+                  <option value="Rank-B">Rank-B (+3)</option>
+                  <option value="Rank-A">Rank-A (+4)</option>
+                  <option value="Rank-S">Rank-S (+5)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Chakra Extra Investido:</label>
+                <input type="number" min="0" v-model.number="clashForm.chakra_extra_a" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs">
+              </div>
+            </div>
+
+            <!-- Combatente B -->
+            <div class="bg-slate-950 p-4 rounded-lg border border-slate-800 space-y-3">
+              <h3 class="font-bold text-xs text-cyan-400 uppercase">Combatente B</h3>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Elemento:</label>
+                <select v-model="clashForm.elemento_b" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs">
+                  <option value="">Não Elemental / Outro</option>
+                  <option value="Fogo">Fogo (Katon)</option>
+                  <option value="Vento">Vento (Futon)</option>
+                  <option value="Relâmpago">Relâmpago (Raiton)</option>
+                  <option value="Terra">Terra (Doton)</option>
+                  <option value="Água">Água (Suiton)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Rank da Técnica:</label>
+                <select v-model="clashForm.rank_b" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs">
+                  <option value="Rank-E">Rank-E (+0)</option>
+                  <option value="Rank-D">Rank-D (+1)</option>
+                  <option value="Rank-C">Rank-C (+2)</option>
+                  <option value="Rank-B">Rank-B (+3)</option>
+                  <option value="Rank-A">Rank-A (+4)</option>
+                  <option value="Rank-S">Rank-S (+5)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Chakra Extra Investido:</label>
+                <input type="number" min="0" v-model.number="clashForm.chakra_extra_b" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs">
+              </div>
+            </div>
+          </div>
+
+          <button 
+            @click="runClashSimulation"
+            class="w-full py-2.5 bg-amber-500 hover:bg-amber-400 font-bold text-slate-950 rounded-lg text-sm transition shadow-lg">
+            ⚡ CALCULAR MODIFICADORES & SUPERIORIDADE
+          </button>
+
+          <!-- Resultado do Clash -->
+          <div v-if="clashResult" class="bg-slate-950 p-4 rounded-lg border border-amber-500/50 space-y-3">
+            <h4 class="font-bold text-xs text-amber-400 uppercase">Resultado da Resolução</h4>
+            <p class="text-xs text-slate-200">{{ clashResult.analise_elemental }}</p>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+              <div class="bg-slate-900 p-2 rounded">
+                <span class="block text-slate-400 text-[10px]">Modificador Total Combatente A</span>
+                <span class="text-lg font-bold text-amber-400">+{{ clashResult.combatente_a.bonus_total_adicional }}</span>
+                <span v-if="clashResult.combatente_a.tem_vantagem" class="block text-[10px] text-emerald-400 font-bold">ROLAR COM VANTAGEM</span>
+              </div>
+              <div class="bg-slate-900 p-2 rounded">
+                <span class="block text-slate-400 text-[10px]">Modificador Total Combatente B</span>
+                <span class="text-lg font-bold text-cyan-400">+{{ clashResult.combatente_b.bonus_total_adicional }}</span>
+                <span v-if="clashResult.combatente_b.tem_vantagem" class="block text-[10px] text-emerald-400 font-bold">ROLAR COM VANTAGEM</span>
+              </div>
+            </div>
+            <div v-if="clashResult.melhor_de_3_obrigatorio" class="bg-amber-500/10 border border-amber-500/30 p-2 rounded text-[11px] text-amber-300">
+              ⚠️ <strong>Melhor de 3:</strong> Como pelo menos uma técnica é de Rank B ou superior, o confronto deve ser disputado em uma melhor de 3 testes resistidos!
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TAB 7: COMPARADOR DE CLÃS (Matriz Geral & Lado a Lado)         -->
+      <!-- ============================================================== -->
+      <div v-show="currentTab === 'clan_compare'" class="flex-1 flex flex-col overflow-hidden bg-slate-950">
+        
+        <!-- Top Toolbar do Comparador -->
+        <div class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-md">
+          
+          <!-- Seletor de Modo e Presets -->
+          <div class="flex items-center gap-3">
+            <div class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs font-semibold">
+              <button 
+                @click="compareMode = 'matrix'"
+                :class="compareMode === 'matrix' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-300 hover:text-white'"
+                class="px-3 py-1 rounded transition flex items-center gap-1.5">
+                <span>📊 Matriz Geral</span>
+                <span class="bg-black/30 px-1.5 py-0.5 rounded text-[10px]">{{ filteredCompareClans.length }}</span>
+              </button>
+              <button 
+                @click="compareMode = 'sidebyside'"
+                :class="compareMode === 'sidebyside' ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'text-slate-300 hover:text-white'"
+                class="px-3 py-1 rounded transition flex items-center gap-1.5">
+                <span>⚖️ Lado a Lado</span>
+                <span class="bg-black/30 px-1.5 py-0.5 rounded text-[10px]">{{ selectedClansForCompare.length }}</span>
+              </button>
+            </div>
+
+            <!-- Presets Temáticos Rápidos -->
+            <div class="hidden xl:flex items-center gap-1 text-[11px]">
+              <span class="text-slate-500 text-[10px] font-medium mr-1">Presets:</span>
+              <button @click="setComparePreset(['Uchiha', 'Hyūga'])" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+                👁️ Dojutsus
+              </button>
+              <button @click="setComparePreset(['Uchiha', 'Senju', 'Sarutobi'])" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+                👑 Fundadores
+              </button>
+              <button @click="setComparePreset(['Yamanaka', 'Nara', 'Akimichi'])" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+                🐗 Ino-Shika-Cho
+              </button>
+              <button @click="setComparePreset(['Uzumaki', 'Senju'])" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+                💉 Cura
+              </button>
+            </div>
+          </div>
+
+          <!-- Chips de Clãs Selecionados & Dropdown para Adicionar -->
+          <div class="flex items-center gap-2 flex-wrap text-xs">
+            <span class="text-slate-400 text-[11px] font-medium">Comparando (máx 4):</span>
+            
+            <div v-for="cName in selectedClansForCompare" :key="cName" class="flex items-center gap-1 bg-amber-500/20 border border-amber-500/40 text-amber-300 px-2 py-0.5 rounded-full text-xs font-semibold">
+              <span>{{ cName }}</span>
+              <button @click="removeClanFromCompare(cName)" class="hover:text-rose-400 font-bold ml-0.5 text-xs">×</button>
+            </div>
+
+            <select 
+              v-model="addClanDropdownValue" 
+              @change="addClanToCompare(addClanDropdownValue)"
+              class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+              <option value="" disabled selected>+ Adicionar Clã...</option>
+              <option v-for="c in compareSummary" :key="c.id" :value="c.nome" :disabled="selectedClansForCompare.includes(c.nome)">
+                {{ c.nome }} ({{ c.total_jutsus }} jutsus)
+              </option>
+            </select>
+
+            <button 
+              v-if="selectedClansForCompare.length"
+              @click="selectedClansForCompare = []; detailedComparedClans = []"
+              class="text-rose-400 hover:text-rose-300 text-[11px] underline ml-1">
+              Limpar
+            </button>
+
+            <button 
+              v-if="selectedClansForCompare.length >= 2"
+              @click="copyComparisonSummary"
+              class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded text-xs transition flex items-center gap-1">
+              📋 Copiar Comparativo
+            </button>
+          </div>
+
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- MODO 1: MATRIZ GERAL (SPREADSHEET DE TODOS OS 45 CLÃS)        -->
+        <!-- ============================================================== -->
+        <div v-show="compareMode === 'matrix'" class="flex-1 flex flex-col overflow-hidden">
+          
+          <!-- Filtros da Matriz -->
+          <div class="bg-slate-900/80 border-b border-slate-800 px-4 py-2 flex flex-wrap items-center gap-2 text-xs shrink-0">
+            <!-- Busca Textual -->
+            <input 
+              v-model="compareSearch" 
+              type="text" 
+              placeholder="🔍 Filtrar clã ou atributo..." 
+              class="bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-slate-100 placeholder-slate-500 w-52 focus:outline-none focus:border-amber-500">
+
+            <!-- Filtro de Atributo -->
+            <select v-model="compareFilterAttr" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200">
+              <option value="">Todos os Atributos</option>
+              <option value="Força">Bônus em Força</option>
+              <option value="Destreza">Bônus em Destreza</option>
+              <option value="Constituição">Bônus em Constituição</option>
+              <option value="Inteligência">Bônus em Inteligência</option>
+              <option value="Sabedoria">Bônus em Sabedoria</option>
+              <option value="Carisma">Bônus em Carisma</option>
+            </select>
+
+            <!-- Filtro de Deslocamento -->
+            <select v-model="compareFilterSpeed" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200">
+              <option value="">Qualquer Deslocamento</option>
+              <option value="10.5">Veloz (≥ 10,5m / 35 pés)</option>
+              <option value="9">Padrão (9m / 30 pés)</option>
+              <option value="5">Especial (5m)</option>
+            </select>
+
+            <!-- Filtro de Rank de Jutsus -->
+            <select v-model="compareFilterRank" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200">
+              <option value="">Qualquer Rank de Jutsu</option>
+              <option value="Rank-S">Tem Jutsus Rank-S</option>
+              <option value="Rank-A">Tem Jutsus Rank-A</option>
+              <option value="Rank-B">Tem Jutsus Rank-B</option>
+              <option value="Rank-C">Tem Jutsus Rank-C</option>
+              <option value="Rank-D">Tem Jutsus Rank-D</option>
+            </select>
+
+            <!-- Filtro de Estilo / Natureza -->
+            <select v-model="compareFilterStyle" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200">
+              <option value="">Qualquer Estilo Elemental</option>
+              <option value="Fogo">Estilo Fogo (Katon)</option>
+              <option value="Água">Estilo Água (Suiton)</option>
+              <option value="Terra">Estilo Terra (Doton)</option>
+              <option value="Vento">Estilo Vento (Futon)</option>
+              <option value="Relâmpago">Estilo Relâmpago (Raiton)</option>
+              <option value="Hijutsu">Hijutsu / Linhagem</option>
+            </select>
+
+            <!-- Toggle Latente -->
+            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300 ml-1">
+              <input type="checkbox" v-model="compareFilterLatent" class="rounded bg-slate-950 border-slate-700 text-amber-500">
+              <span>Com Linhagem Latente</span>
+            </label>
+
+            <!-- Botão Limpar -->
+            <button 
+              v-if="compareSearch || compareFilterAttr || compareFilterSpeed || compareFilterRank || compareFilterStyle || compareFilterLatent"
+              @click="compareSearch = ''; compareFilterAttr = ''; compareFilterSpeed = ''; compareFilterRank = ''; compareFilterStyle = ''; compareFilterLatent = false"
+              class="text-rose-400 hover:underline text-[11px] ml-auto">
+              Resetar Filtros
+            </button>
+          </div>
+
+          <!-- Tabela de Dados Densa da Matriz -->
+          <div class="flex-1 overflow-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-900 border-b border-slate-800 text-[11px] text-slate-400 uppercase font-semibold sticky top-0 z-10 shadow">
+                <tr>
+                  <th class="p-2.5 text-center w-20">Comparar</th>
+                  <th @click="sortByColumn('nome')" class="p-2.5 cursor-pointer hover:text-white">
+                    Clã <span v-if="compareSortKey === 'nome'">{{ compareSortAsc ? '▲' : '▼' }}</span>
+                  </th>
+                  <th class="p-2.5">Bônus de Atributos (ASI)</th>
+                  <th @click="sortByColumn('deslocamento_metros')" class="p-2.5 cursor-pointer hover:text-white">
+                    Deslocamento <span v-if="compareSortKey === 'deslocamento_metros'">{{ compareSortAsc ? '▲' : '▼' }}</span>
+                  </th>
+                  <th class="p-2.5">Perícias Concedidas</th>
+                  <th @click="sortByColumn('total_recursos')" class="p-2.5 cursor-pointer hover:text-white text-center">
+                    Recursos <span v-if="compareSortKey === 'total_recursos'">{{ compareSortAsc ? '▲' : '▼' }}</span>
+                  </th>
+                  <th @click="sortByColumn('total_jutsus')" class="p-2.5 cursor-pointer hover:text-white text-center">
+                    Jutsus Exclusivos <span v-if="compareSortKey === 'total_jutsus'">{{ compareSortAsc ? '▲' : '▼' }}</span>
+                  </th>
+                  <th class="p-2.5">Ranks & Estilos Acessíveis</th>
+                  <th @click="sortByColumn('total_latentes')" class="p-2.5 cursor-pointer hover:text-white text-center">
+                    Linhagens Latentes <span v-if="compareSortKey === 'total_latentes'">{{ compareSortAsc ? '▲' : '▼' }}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/80 font-sans">
+                <tr 
+                  v-for="c in filteredCompareClans" 
+                  :key="c.id"
+                  :class="selectedClansForCompare.includes(c.nome) ? 'bg-amber-500/10' : 'hover:bg-slate-900/60'"
+                  class="transition">
+                  
+                  <!-- Checkbox de Comparar -->
+                  <td class="p-2.5 text-center">
+                    <button 
+                      @click="toggleClanForCompare(c.nome)"
+                      :class="selectedClansForCompare.includes(c.nome) ? 'bg-amber-500 text-slate-950 font-bold border-amber-400' : 'bg-slate-950 text-slate-400 border-slate-700 hover:border-slate-500'"
+                      class="px-2 py-0.5 rounded text-[11px] border transition">
+                      {{ selectedClansForCompare.includes(c.nome) ? '✓ Ativo' : '+ Add' }}
+                    </button>
+                  </td>
+
+                  <!-- Nome do Clã -->
+                  <td class="p-2.5 font-bold text-slate-100 flex items-center gap-1.5">
+                    <span>{{ c.nome }}</span>
+                    <span class="text-[10px] text-slate-500 font-normal">p.{{ c.pagina }}</span>
+                  </td>
+
+                  <!-- Atributos Concedidos -->
+                  <td class="p-2.5">
+                    <div class="flex flex-wrap gap-1">
+                      <span 
+                        v-for="(val, attr) in c.aumento_atributos" 
+                        :key="attr"
+                        :class="getAttrBadgeClass(attr)"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-bold border">
+                        +{{ val }} {{ attr }}
+                      </span>
+                      <span v-if="!Object.keys(c.aumento_atributos).length" class="text-slate-500 text-[11px]">
+                        {{ c.aumento_atributos_raw || 'Especial' }}
+                      </span>
+                    </div>
+                  </td>
+
+                  <!-- Deslocamento -->
+                  <td class="p-2.5">
+                    <span 
+                      :class="c.deslocamento_metros >= 10 ? 'text-emerald-400 font-bold' : 'text-slate-300'"
+                      class="px-1.5 py-0.5 bg-slate-950 rounded border border-slate-800 text-[11px]">
+                      {{ c.deslocamento }}
+                    </span>
+                  </td>
+
+                  <!-- Perícias -->
+                  <td class="p-2.5">
+                    <div class="flex flex-wrap gap-1 max-w-xs">
+                      <span 
+                        v-for="p in c.pericias" 
+                        :key="p"
+                        class="px-1.5 py-0.5 bg-slate-950 border border-slate-800 rounded text-[10px] text-slate-300">
+                        {{ p }}
+                      </span>
+                      <span v-if="!c.pericias.length" class="text-slate-500 text-[10px]">Nenhuma fixa</span>
+                    </div>
+                  </td>
+
+                  <!-- Recursos de Clã -->
+                  <td class="p-2.5 text-center">
+                    <span class="px-2 py-0.5 bg-indigo-950/70 border border-indigo-800 text-indigo-300 rounded font-bold text-[11px]">
+                      {{ c.total_recursos }}
+                    </span>
+                  </td>
+
+                  <!-- Jutsus Exclusivos -->
+                  <td class="p-2.5 text-center">
+                    <span 
+                      :class="c.total_jutsus > 0 ? 'bg-amber-950/70 border-amber-800 text-amber-300' : 'bg-slate-950 border-slate-800 text-slate-500'"
+                      class="px-2 py-0.5 border rounded font-bold text-[11px]">
+                      {{ c.total_jutsus }}
+                    </span>
+                  </td>
+
+                  <!-- Ranks & Estilos -->
+                  <td class="p-2.5">
+                    <div class="flex flex-col gap-1">
+                      <div class="flex flex-wrap gap-1" v-if="c.ranks_jutsus.length">
+                        <span 
+                          v-for="rk in c.ranks_jutsus" 
+                          :key="rk"
+                          :class="getRankBadgeClass(rk)"
+                          class="px-1 py-0.2 rounded text-[9px] font-bold">
+                          {{ rk.replace('Rank-', '') }}
+                        </span>
+                      </div>
+                      <div class="flex flex-wrap gap-1" v-if="c.estilos_jutsus.length">
+                        <span 
+                          v-for="est in c.estilos_jutsus.slice(0, 3)" 
+                          :key="est"
+                          class="text-[10px] text-slate-400">
+                          {{ est }}
+                        </span>
+                        <span v-if="c.estilos_jutsus.length > 3" class="text-[10px] text-slate-500">
+                          +{{ c.estilos_jutsus.length - 3 }}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- Linhagens Latentes -->
+                  <td class="p-2.5 text-center">
+                    <span 
+                      v-if="c.total_latentes > 0"
+                      class="px-2 py-0.5 bg-emerald-950/70 border border-emerald-800 text-emerald-300 rounded font-bold text-[11px]">
+                      {{ c.total_latentes }} <span class="text-[9px] font-normal opacity-80">({{ c.latentes_min_pontos }}-{{ c.latentes_max_pontos }} pts)</span>
+                    </span>
+                    <span v-else class="text-slate-600 text-[10px]">-</span>
+                  </td>
+
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- MODO 2: COMPARATIVO LADO A LADO (2 A 4 CLÃS)                   -->
+        <!-- ============================================================== -->
+        <div v-show="compareMode === 'sidebyside'" class="flex-1 flex flex-col overflow-y-auto p-4">
+          
+          <!-- Aviso se menos de 2 clãs selecionados -->
+          <div v-if="selectedClansForCompare.length < 2" class="max-w-xl mx-auto my-auto text-center p-8 bg-slate-900 border border-slate-800 rounded-xl space-y-4 shadow-xl">
+            <span class="text-4xl">⚖️</span>
+            <h3 class="text-lg font-bold text-slate-200">Selecione pelo menos 2 clãs para comparar</h3>
+            <p class="text-xs text-slate-400">
+              Escolha clãs na Matriz Geral clicando em <strong>"+ Add"</strong> ou utilize um dos presets rápidos abaixo:
+            </p>
+            <div class="flex flex-wrap justify-center gap-2 pt-2">
+              <button @click="setComparePreset(['Uchiha', 'Hyūga'])" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-xs border border-slate-700 transition">
+                👁️ Uchiha vs Hyūga
+              </button>
+              <button @click="setComparePreset(['Uchiha', 'Senju', 'Sarutobi'])" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-xs border border-slate-700 transition">
+                👑 Fundadores de Konoha
+              </button>
+              <button @click="setComparePreset(['Yamanaka', 'Nara', 'Akimichi'])" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-xs border border-slate-700 transition">
+                🐗 Trio Ino-Shika-Cho
+              </button>
+            </div>
+          </div>
+
+          <!-- Grid Comparativo Lado a Lado -->
+          <div v-else class="grid gap-4 items-start" :class="{
+            'grid-cols-1 md:grid-cols-2': detailedComparedClans.length === 2,
+            'grid-cols-1 md:grid-cols-3': detailedComparedClans.length === 3,
+            'grid-cols-1 md:grid-cols-2 xl:grid-cols-4': detailedComparedClans.length >= 4
+          }">
+            
+            <div 
+              v-for="item in detailedComparedClans" 
+              :key="item.cla.id"
+              class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-xl">
+              
+              <!-- Cabeçalho do Clã -->
+              <div class="bg-gradient-to-r from-slate-900 to-slate-850 p-4 border-b border-slate-800 flex justify-between items-start">
+                <div>
+                  <span class="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Estudos da Tsunade • p.{{ item.cla.pagina }}</span>
+                  <h3 class="text-xl font-bold text-slate-100 leading-tight">Clã {{ item.cla.nome }}</h3>
+                </div>
+                <button 
+                  @click="removeClanFromCompare(item.cla.nome)" 
+                  class="text-slate-400 hover:text-rose-400 text-sm font-bold bg-slate-950/60 p-1 rounded-full w-6 h-6 flex items-center justify-center border border-slate-800 transition">
+                  ✕
+                </button>
+              </div>
+
+              <!-- Resumo Numérico Rápido -->
+              <div class="grid grid-cols-3 divide-x divide-slate-800 border-b border-slate-800 bg-slate-950/50 text-center py-2 text-xs">
+                <div>
+                  <span class="block text-slate-500 text-[10px]">Jutsus</span>
+                  <span class="font-bold text-amber-400 text-sm">{{ item.stats.total_jutsus }}</span>
+                </div>
+                <div>
+                  <span class="block text-slate-500 text-[10px]">Latentes</span>
+                  <span class="font-bold text-emerald-400 text-sm">{{ item.stats.total_latentes }}</span>
+                </div>
+                <div>
+                  <span class="block text-slate-500 text-[10px]">Recursos</span>
+                  <span class="font-bold text-indigo-400 text-sm">{{ item.stats.total_recursos }}</span>
+                </div>
+              </div>
+
+              <div class="p-4 space-y-5 text-xs divide-y divide-slate-800/80">
+                
+                <!-- Bloco 1: Atributos & Deslocamento -->
+                <div>
+                  <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                    <span>🧬</span> Atributos & Mobilidade
+                  </h4>
+                  <div class="space-y-2">
+                    <div class="flex flex-wrap gap-1">
+                      <span 
+                        v-for="(val, attr) in item.cla.aumento_atributos" 
+                        :key="attr"
+                        :class="getAttrBadgeClass(attr)"
+                        class="px-2 py-0.5 rounded text-xs font-bold border">
+                        +{{ val }} {{ attr }}
+                      </span>
+                      <span v-if="!Object.keys(item.cla.aumento_atributos).length" class="text-slate-300">
+                        {{ item.cla.aumento_atributos_raw }}
+                      </span>
+                    </div>
+
+                    <div class="flex items-center justify-between text-slate-300 pt-1">
+                      <span class="text-slate-500">Deslocamento:</span>
+                      <span class="font-bold text-slate-200">{{ item.cla.deslocamento_formatado }}</span>
+                    </div>
+
+                    <div class="pt-1">
+                      <span class="text-slate-500 block mb-1">Perícias Concedidas:</span>
+                      <div class="flex flex-wrap gap-1">
+                        <span 
+                          v-for="p in item.cla.pericias" 
+                          :key="p"
+                          class="px-1.5 py-0.5 bg-slate-950 border border-slate-800 rounded text-[10px] text-slate-300">
+                          {{ p }}
+                        </span>
+                        <span v-if="!item.cla.pericias.length" class="text-slate-500 text-[11px]">Nenhuma fixa</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Bloco 2: Recursos de Clã -->
+                <div class="pt-4">
+                  <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                    <span>⚡</span> Recursos de Linhagem ({{ item.cla.recursos.length }})
+                  </h4>
+                  <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    <div 
+                      v-for="(rec, rIdx) in item.cla.recursos" 
+                      :key="rIdx"
+                      class="bg-slate-950 p-2.5 rounded border border-slate-800/80 space-y-1">
+                      <div class="flex justify-between items-center text-xs">
+                        <strong class="text-amber-300">{{ rec.nome }}</strong>
+                        <span class="text-[10px] text-indigo-400 font-semibold">{{ rec.nivel }}º Nível</span>
+                      </div>
+                      <span v-if="rec.usos" class="inline-block text-[10px] text-emerald-400 bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-800/40">
+                        {{ rec.usos }}
+                      </span>
+                      <p class="text-[11px] text-slate-300 leading-relaxed font-sans line-clamp-3 hover:line-clamp-none transition">
+                        {{ rec.descricao }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Bloco 3: Jutsus Exclusivos -->
+                <div class="pt-4">
+                  <div class="flex justify-between items-center mb-2">
+                    <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <span>🍃</span> Jutsus Exclusivos ({{ item.stats.total_jutsus }})
+                    </h4>
+                    <span v-if="item.stats.total_jutsus" class="text-[10px] text-slate-400 font-mono">
+                      Média: {{ item.stats.custo_chakra_medio }} Chakra
+                    </span>
+                  </div>
+
+                  <!-- Mini Ranks Bar -->
+                  <div class="flex gap-1 mb-2" v-if="item.stats.total_jutsus">
+                    <span 
+                      v-for="(cnt, rk) in item.stats.jutsus_por_rank" 
+                      :key="rk"
+                      :class="getRankBadgeClass(rk)"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-bold">
+                      {{ rk.replace('Rank-', '') }}: {{ cnt }}
+                    </span>
+                  </div>
+
+                  <!-- Lista de Técnicas com Modal e Copiar -->
+                  <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                    <div 
+                      v-for="j in item.jutsus_exclusivos" 
+                      :key="j.id"
+                      class="bg-slate-950 p-2 rounded border border-slate-800/80 flex items-center justify-between text-xs hover:border-slate-700 transition">
+                      <div class="overflow-hidden mr-2">
+                        <div class="flex items-center gap-1.5">
+                          <span :class="getRankBadgeClass(j.rank)" class="px-1 py-0.2 rounded text-[9px] font-bold shrink-0">
+                            {{ j.rank.replace('Rank-', '') }}
+                          </span>
+                          <span class="font-bold text-slate-200 truncate">{{ j.nome }}</span>
+                        </div>
+                        <span class="text-[10px] text-amber-400 font-mono">{{ j.custo_chakra }} Chakra • {{ j.tempo_conjuracao }}</span>
+                      </div>
+                      <div class="flex items-center gap-1 shrink-0">
+                        <button 
+                          @click="openJutsuModal(j)"
+                          class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] transition">
+                          Ver
+                        </button>
+                        <button 
+                          @click="copyJutsuRule(j)"
+                          title="Copiar Regra"
+                          class="px-1.5 py-0.5 bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-300 rounded text-[10px] transition">
+                          📋
+                        </button>
+                      </div>
+                    </div>
+                    <div v-if="!item.jutsus_exclusivos.length" class="text-slate-500 text-center py-4 text-xs">
+                      Nenhum jutsu exclusivo registrado para este clã.
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Bloco 4: Linhagens Latentes -->
+                <div class="pt-4">
+                  <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                    <span>🩸</span> Linhagens Latentes ({{ item.stats.total_latentes }})
+                  </h4>
+                  <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                    <div 
+                      v-for="lat in item.linhagens_latentes" 
+                      :key="lat.id"
+                      class="bg-slate-950 p-2 rounded border border-slate-800/80 space-y-1 text-xs">
+                      <div class="flex justify-between items-center">
+                        <strong class="text-emerald-300">{{ lat.nome_habilidade }}</strong>
+                        <span class="px-1.5 py-0.2 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded text-[10px] font-bold font-mono">
+                          {{ lat.custo_pontos }} pt{{ lat.custo_pontos > 1 ? 's' : '' }}
+                        </span>
+                      </div>
+                      <span v-if="lat.pre_requisito" class="block text-[10px] text-slate-400 italic">
+                        Requisito: {{ lat.pre_requisito }}
+                      </span>
+                      <p class="text-[11px] text-slate-300 leading-relaxed font-sans line-clamp-2 hover:line-clamp-none transition">
+                        {{ lat.descricao }}
+                      </p>
+                    </div>
+                    <div v-if="!item.linhagens_latentes.length" class="text-slate-500 text-center py-4 text-xs">
+                      Nenhuma habilidade de linhagem latente registrada.
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- MODAL DE DETALHES COMPLETOS DO JUTSU                           -->
+    <!-- ============================================================== -->
+    <div 
+      v-if="modalJutsu" 
+      @click.self="modalJutsu = null"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl flex flex-col gap-4">
+        
+        <!-- Header Modal -->
+        <div class="flex justify-between items-start border-b border-slate-800 pb-3">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span :class="getRankBadgeClass(modalJutsu.rank)" class="px-2 py-0.5 rounded text-[11px] font-bold">
+                {{ modalJutsu.rank }}
+              </span>
+              <span class="text-xs text-amber-400 font-bold">{{ modalJutsu.classificacao }}</span>
+              <span v-if="modalJutsu.cla" class="text-xs text-rose-400 font-semibold">• Clã {{ modalJutsu.cla }}</span>
+            </div>
+            <h2 class="text-xl font-bold text-slate-100">{{ modalJutsu.nome }}</h2>
+          </div>
+          <button @click="modalJutsu = null" class="text-slate-400 hover:text-white text-lg">✕</button>
+        </div>
+
+        <!-- Estatísticas Rápidas -->
+        <div class="grid grid-cols-3 gap-2 text-xs font-mono">
+          <div class="bg-slate-950 p-2 rounded border border-slate-800">
+            <span class="block text-slate-500 text-[10px]">Custo Chakra</span>
+            <span class="text-amber-400 font-bold">{{ modalJutsu.custo_chakra }} pontos</span>
+          </div>
+          <div class="bg-slate-950 p-2 rounded border border-slate-800">
+            <span class="block text-slate-500 text-[10px]">Tempo de Ação</span>
+            <span class="text-slate-200">{{ modalJutsu.tempo_conjuracao }}</span>
+          </div>
+          <div class="bg-slate-950 p-2 rounded border border-slate-800">
+            <span class="block text-slate-500 text-[10px]">Alcance</span>
+            <span class="text-slate-200">{{ modalJutsu.alcance }}</span>
+          </div>
+          <div class="bg-slate-950 p-2 rounded border border-slate-800">
+            <span class="block text-slate-500 text-[10px]">Duração</span>
+            <span class="text-slate-200">{{ modalJutsu.duracao }}</span>
+          </div>
+          <div class="bg-slate-950 p-2 rounded border border-slate-800">
+            <span class="block text-slate-500 text-[10px]">Componentes</span>
+            <span class="text-slate-200">{{ modalJutsu.componentes.join(', ') || 'Nenhum' }}</span>
+          </div>
+          <div class="bg-slate-950 p-2 rounded border border-slate-800">
+            <span class="block text-slate-500 text-[10px]">Salvaguarda</span>
+            <span class="text-cyan-400 font-bold">{{ modalJutsu.salvaguarda || 'Nenhuma' }}</span>
+          </div>
+        </div>
+
+        <!-- Regra Mecânica -->
+        <div>
+          <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Efeito Mecânico (Regra Estrita)</h4>
+          <p class="text-xs text-slate-200 leading-relaxed font-sans bg-slate-950 p-3 rounded-lg border border-slate-800/80 whitespace-pre-line">
+            {{ modalJutsu.efeito_mecanico }}
+          </p>
+        </div>
+
+        <!-- Escalonamento Upcast -->
+        <div v-if="modalJutsu.em_niveis_mais_altos">
+          <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Em Níveis Mais Altos (Upcast)</h4>
+          <p class="text-xs text-slate-300 leading-relaxed font-sans bg-slate-950 p-3 rounded-lg border border-slate-800/80">
+            {{ modalJutsu.em_niveis_mais_altos }}
+          </p>
+        </div>
+
+        <!-- Rodapé do Modal -->
+        <div class="flex items-center justify-between pt-2 border-t border-slate-800 text-xs text-slate-400">
+          <span>📖 {{ modalJutsu.origem_livro }} (Página {{ modalJutsu.pagina }})</span>
+          <button 
+            @click="copyJutsuRule(modalJutsu)"
+            class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 font-medium rounded transition flex items-center gap-1">
+            📋 Copiar Regra
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const { createApp, ref, reactive, computed, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const currentTab = ref('jutsus');
+        const eqSubTab = ref('weapons');
+        const viewMode = ref('table');
+        const jutsuLoading = ref(false);
+        const modalJutsu = ref(null);
+        const selectedJutsu = ref(null);
+
+        const tabs = [
+          { id: 'jutsus', label: 'Jutsus', icon: '🍃', countKey: 'jutsus' },
+          { id: 'clans', label: 'Clãs & Linhagens', icon: '🧬', countKey: 'clans' },
+          { id: 'clan_compare', label: 'Comparador de Clãs', icon: '⚖️', countKey: 'clans' },
+          { id: 'classes', label: 'Classes & Arquétipos', icon: '🥋', countKey: 'classes' },
+          { id: 'equipment', label: 'Equipamentos & Selos', icon: '🗡️', countKey: 'weapons' },
+          { id: 'rules', label: 'Regras & Condições', icon: '⚠️', countKey: 'conditions' },
+          { id: 'clash', label: 'Calculadora de Clash', icon: '⚔️', countKey: null }
+        ];
+
+        const counts = reactive({
+          jutsus: 1677, clans: 45, classes: 11, weapons: 68, armors: 18, fuinjutsu_seals: 139, conditions: 31
+        });
+
+        const meta = ref({});
+        const jutsuData = reactive({ total: 0, items: [] });
+        const clansList = ref([]);
+        const activeClan = ref(null);
+        const clanSearch = ref('');
+        const classesList = ref([]);
+        const activeClass = ref(null);
+        const weaponsList = ref([]);
+        const armorsList = ref([]);
+        const fuinjutsuList = ref([]);
+        const conditionsList = ref([]);
+        const combatRulesList = ref([]);
+
+        // Filtros de Jutsu
+        const jFilters = reactive({
+          q: '',
+          ranks: [],
+          classificacoes: [],
+          naturezas: [],
+          cla: '',
+          exclusividade: 'todos',
+          minChakra: 0,
+          maxChakra: 40,
+          tempo: '',
+          salvaguarda: '',
+          danoTipo: '',
+          condicao: '',
+          palavraChave: '',
+          possuiVantagem: false,
+          possuiUpcast: false,
+          sortBy: 'rank_asc',
+          limit: 50,
+          offset: 0
+        });
+
+        // Formulário do Clash
+        const clashForm = reactive({
+          elemento_a: 'Fogo',
+          rank_a: 'Rank-C',
+          chakra_extra_a: 0,
+          elemento_b: 'Vento',
+          rank_b: 'Rank-C',
+          chakra_extra_b: 0
+        });
+        const clashResult = ref(null);
+
+        // Fetch de Jutsus
+        const fetchJutsus = async () => {
+          jutsuLoading.value = true;
+          const params = new URLSearchParams();
+          if (jFilters.q) params.append('q', jFilters.q);
+          if (jFilters.ranks.length) params.append('rank', jFilters.ranks.join(','));
+          if (jFilters.classificacoes.length) params.append('classificacao', jFilters.classificacoes.join(','));
+          if (jFilters.naturezas.length) params.append('natureza', jFilters.naturezas.join(','));
+          if (jFilters.cla) params.append('cla', jFilters.cla);
+          if (jFilters.exclusividade === 'apenas_cla') params.append('apenas_cla', 'true');
+          if (jFilters.exclusividade === 'apenas_gerais') params.append('apenas_gerais', 'true');
+          if (jFilters.minChakra > 0) params.append('min_chakra', jFilters.minChakra);
+          if (jFilters.maxChakra < 40) params.append('max_chakra', jFilters.maxChakra);
+          if (jFilters.tempo) params.append('tempo_conjuracao', jFilters.tempo);
+          if (jFilters.salvaguarda) params.append('salvaguarda', jFilters.salvaguarda);
+          if (jFilters.danoTipo) params.append('dano_tipo', jFilters.danoTipo);
+          if (jFilters.condicao) params.append('condicao', jFilters.condicao);
+          if (jFilters.palavraChave) params.append('palavra_chave', jFilters.palavraChave);
+          if (jFilters.possuiVantagem) params.append('possui_vantagem', 'true');
+          if (jFilters.possuiUpcast) params.append('possui_upcast', 'true');
+          params.append('sort_by', jFilters.sortBy);
+          params.append('limit', jFilters.limit);
+          params.append('offset', jFilters.offset);
+
+          try {
+            const res = await fetch(`/api/jutsus?${params.toString()}`);
+            const data = await res.json();
+            jutsuData.total = data.total;
+            jutsuData.items = data.items;
+          } catch (err) {
+            console.error('Erro ao buscar jutsus:', err);
+          } finally {
+            jutsuLoading.value = false;
+          }
+        };
+
+        let debounceTimer = null;
+        const debouncedFetchJutsus = () => {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            jFilters.offset = 0;
+            fetchJutsus();
+          }, 300);
+        };
+
+        const toggleFilterList = (listKey, val) => {
+          const arr = jFilters[listKey];
+          const idx = arr.indexOf(val);
+          if (idx >= 0) arr.splice(idx, 1);
+          else arr.push(val);
+          jFilters.offset = 0;
+          fetchJutsus();
+        };
+
+        const resetJutsuFilters = () => {
+          jFilters.q = '';
+          jFilters.ranks = [];
+          jFilters.classificacoes = [];
+          jFilters.naturezas = [];
+          jFilters.cla = '';
+          jFilters.exclusividade = 'todos';
+          jFilters.minChakra = 0;
+          jFilters.maxChakra = 40;
+          jFilters.tempo = '';
+          jFilters.salvaguarda = '';
+          jFilters.danoTipo = '';
+          jFilters.condicao = '';
+          jFilters.palavraChave = '';
+          jFilters.possuiVantagem = false;
+          jFilters.possuiUpcast = false;
+          jFilters.offset = 0;
+          fetchJutsus();
+        };
+
+        const setChakraPreset = (min, max) => {
+          jFilters.minChakra = min;
+          jFilters.maxChakra = max;
+          jFilters.offset = 0;
+          fetchJutsus();
+        };
+
+        const prevJutsuPage = () => {
+          if (jFilters.offset > 0) {
+            jFilters.offset = Math.max(0, jFilters.offset - jFilters.limit);
+            fetchJutsus();
+          }
+        };
+
+        const nextJutsuPage = () => {
+          if (jFilters.offset + jFilters.limit < jutsuData.total) {
+            jFilters.offset += jFilters.limit;
+            fetchJutsus();
+          }
+        };
+
+        const selectJutsu = (j) => { selectedJutsu.value = j; };
+        const openJutsuModal = (j) => { modalJutsu.value = j; };
+
+        const copyJutsuRule = (j) => {
+          const text = `**[${j.rank}] ${j.nome}** (Custo: ${j.custo_chakra} Chakra | Ação: ${j.tempo_conjuracao} | Alcance: ${j.alcance})\n${j.efeito_mecanico}${j.em_niveis_mais_altos ? '\n**Em Níveis Mais Altos:** ' + j.em_niveis_mais_altos : ''}`;
+          navigator.clipboard.writeText(text);
+          alert('Regra mecânica copiada para a área de transferência!');
+        };
+
+        // Clãs
+        const loadClans = async () => {
+          const res = await fetch('/api/clans');
+          clansList.value = await res.json();
+          if (clansList.value.length) loadClanDetail(clansList.value[0].nome);
+        };
+
+        const loadClanDetail = async (nome) => {
+          const res = await fetch(`/api/clans/${encodeURIComponent(nome)}`);
+          activeClan.value = await res.json();
+        };
+
+        const filteredClans = computed(() => {
+          if (!clanSearch.value) return clansList.value;
+          return clansList.value.filter(c => c.nome.toLowerCase().includes(clanSearch.value.toLowerCase()));
+        });
+
+        // Classes
+        const loadClasses = async () => {
+          const res = await fetch('/api/classes');
+          classesList.value = await res.json();
+          if (classesList.value.length) loadClassDetail(classesList.value[0].nome);
+        };
+
+        const loadClassDetail = async (nome) => {
+          const res = await fetch(`/api/classes/${encodeURIComponent(nome)}`);
+          activeClass.value = await res.json();
+        };
+
+        // Equipamentos & Selos
+        const loadEquipment = async () => {
+          const [wRes, aRes, fRes] = await Promise.all([
+            fetch('/api/equipment/weapons'),
+            fetch('/api/equipment/armors'),
+            fetch('/api/equipment/fuinjutsu')
+          ]);
+          weaponsList.value = await wRes.json();
+          armorsList.value = await aRes.json();
+          fuinjutsuList.value = await fRes.json();
+        };
+
+        // Condições & Regras
+        const loadRules = async () => {
+          const [cRes, rRes] = await Promise.all([
+            fetch('/api/rules/conditions'),
+            fetch('/api/rules/combat')
+          ]);
+          conditionsList.value = await cRes.json();
+          combatRulesList.value = await rRes.json();
+        };
+
+        // Clash Simulator
+        const runClashSimulation = async () => {
+          const res = await fetch('/api/rules/clash-calculator', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(clashForm)
+          });
+          clashResult.value = await res.json();
+        };
+
+        // Badge Classes
+        const getRankBadgeClass = (rank) => {
+          const r = rank?.replace('Rank-', '') || '';
+          const map = {
+            'E': 'bg-slate-700 text-slate-200',
+            'D': 'bg-emerald-950 text-emerald-300 border border-emerald-700',
+            'C': 'bg-blue-950 text-blue-300 border border-blue-700',
+            'B': 'bg-purple-950 text-purple-300 border border-purple-700',
+            'A': 'bg-rose-950 text-rose-300 border border-rose-700',
+            'S': 'bg-amber-400 text-slate-950 font-black'
+          };
+          return map[r] || 'bg-slate-800 text-slate-300';
+        };
+
+        const getNatureColor = (nat) => {
+          if (!nat) return 'text-slate-500';
+          if (nat.includes('Fogo')) return 'text-orange-400';
+          if (nat.includes('Vento')) return 'text-emerald-400';
+          if (nat.includes('Relâmpago')) return 'text-yellow-300';
+          if (nat.includes('Terra')) return 'text-amber-600';
+          if (nat.includes('Água')) return 'text-cyan-400';
+          if (nat.includes('Médico')) return 'text-teal-300';
+          return 'text-slate-300';
+        };
+
+        // ==============================================================
+        // COMPARADOR DE CLÃS (State & Methods)
+        // ==============================================================
+        const compareMode = ref('matrix');
+        const compareSummary = ref([]);
+        const compareLoading = ref(false);
+        const compareSearch = ref('');
+        const compareFilterAttr = ref('');
+        const compareFilterSpeed = ref('');
+        const compareFilterRank = ref('');
+        const compareFilterStyle = ref('');
+        const compareFilterLatent = ref(false);
+        const compareSortKey = ref('nome');
+        const compareSortAsc = ref(true);
+
+        const selectedClansForCompare = ref(['Uchiha', 'Hyūga']);
+        const detailedComparedClans = ref([]);
+        const comparedClansLoading = ref(false);
+        const addClanDropdownValue = ref('');
+
+        const loadCompareSummary = async () => {
+          compareLoading.value = true;
+          try {
+            const res = await fetch('/api/clans/compare/summary');
+            if (res.ok) {
+              compareSummary.value = await res.json();
+            }
+          } catch (e) {
+            console.error('Erro ao carregar resumo de comparação de clãs:', e);
+          } finally {
+            compareLoading.value = false;
+          }
+        };
+
+        const fetchComparedClans = async () => {
+          if (!selectedClansForCompare.value.length) {
+            detailedComparedClans.value = [];
+            return;
+          }
+          comparedClansLoading.value = true;
+          try {
+            const names = selectedClansForCompare.value.join(',');
+            const res = await fetch(`/api/clans/compare?names=${encodeURIComponent(names)}`);
+            if (res.ok) {
+              detailedComparedClans.value = await res.json();
+            }
+          } catch (e) {
+            console.error('Erro ao buscar clãs comparados:', e);
+          } finally {
+            comparedClansLoading.value = false;
+          }
+        };
+
+        const toggleClanForCompare = (cName) => {
+          const idx = selectedClansForCompare.value.indexOf(cName);
+          if (idx >= 0) {
+            selectedClansForCompare.value.splice(idx, 1);
+          } else {
+            if (selectedClansForCompare.value.length >= 4) {
+              alert('Você pode comparar no máximo 4 clãs simultaneamente.');
+              return;
+            }
+            selectedClansForCompare.value.push(cName);
+          }
+          fetchComparedClans();
+        };
+
+        const removeClanFromCompare = (cName) => {
+          selectedClansForCompare.value = selectedClansForCompare.value.filter(n => n !== cName);
+          fetchComparedClans();
+        };
+
+        const addClanToCompare = (cName) => {
+          if (!cName) return;
+          if (!selectedClansForCompare.value.includes(cName)) {
+            if (selectedClansForCompare.value.length >= 4) {
+              alert('Você pode comparar no máximo 4 clãs simultaneamente.');
+              return;
+            }
+            selectedClansForCompare.value.push(cName);
+            fetchComparedClans();
+          }
+          addClanDropdownValue.value = '';
+        };
+
+        const setComparePreset = (clans) => {
+          selectedClansForCompare.value = [...clans];
+          compareMode.value = 'sidebyside';
+          fetchComparedClans();
+        };
+
+        const sortByColumn = (key) => {
+          if (compareSortKey.value === key) {
+            compareSortAsc.value = !compareSortAsc.value;
+          } else {
+            compareSortKey.value = key;
+            compareSortAsc.value = true;
+          }
+        };
+
+        const filteredCompareClans = computed(() => {
+          return compareSummary.value.filter(c => {
+            if (compareSearch.value) {
+              const q = compareSearch.value.toLowerCase();
+              const mName = c.nome.toLowerCase().includes(q);
+              const mAttr = c.aumento_atributos_raw && c.aumento_atributos_raw.toLowerCase().includes(q);
+              if (!mName && !mAttr) return false;
+            }
+            if (compareFilterAttr.value) {
+              const hasAttr = Object.keys(c.aumento_atributos).some(k => k.toLowerCase().includes(compareFilterAttr.value.toLowerCase()));
+              if (!hasAttr) return false;
+            }
+            if (compareFilterSpeed.value) {
+              if (compareFilterSpeed.value === '10.5' && c.deslocamento_metros < 10) return false;
+              if (compareFilterSpeed.value === '9' && (c.deslocamento_metros < 8.5 || c.deslocamento_metros > 9.5)) return false;
+              if (compareFilterSpeed.value === '5' && c.deslocamento_metros > 6) return false;
+            }
+            if (compareFilterRank.value) {
+              if (!c.ranks_jutsus.includes(compareFilterRank.value)) return false;
+            }
+            if (compareFilterStyle.value) {
+              const hasStyle = c.estilos_jutsus.some(s => s.toLowerCase().includes(compareFilterStyle.value.toLowerCase()));
+              if (!hasStyle) return false;
+            }
+            if (compareFilterLatent.value) {
+              if (c.total_latentes <= 0) return false;
+            }
+            return true;
+          }).sort((a, b) => {
+            let valA = a[compareSortKey.value];
+            let valB = b[compareSortKey.value];
+            if (typeof valA === 'string') {
+              return compareSortAsc.value ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+            return compareSortAsc.value ? (valA - valB) : (valB - valA);
+          });
+        });
+
+        const getAttrBadgeClass = (attr) => {
+          const a = attr.toLowerCase();
+          if (a.includes('força') || a.includes('for')) return 'bg-rose-950/80 text-rose-300 border-rose-800';
+          if (a.includes('destreza') || a.includes('des')) return 'bg-emerald-950/80 text-emerald-300 border-emerald-800';
+          if (a.includes('constituição') || a.includes('con')) return 'bg-amber-950/80 text-amber-300 border-amber-800';
+          if (a.includes('inteligência') || a.includes('int')) return 'bg-blue-950/80 text-blue-300 border-blue-800';
+          if (a.includes('sabedoria') || a.includes('sab')) return 'bg-purple-950/80 text-purple-300 border-purple-800';
+          if (a.includes('carisma') || a.includes('car')) return 'bg-pink-950/80 text-pink-300 border-pink-800';
+          return 'bg-slate-800 text-slate-300 border-slate-700';
+        };
+
+        const copyComparisonSummary = () => {
+          if (!detailedComparedClans.value.length) return;
+          let md = `# ⚖️ Comparativo Shinobi: ${selectedClansForCompare.value.join(' vs ')}\n\n`;
+          md += `| Atributo / Métrica | ` + detailedComparedClans.value.map(c => `**${c.cla.nome}**`).join(' | ') + ` |\n`;
+          md += `| :--- | ` + detailedComparedClans.value.map(() => `:---`).join(' | ') + ` |\n`;
+          md += `| **Atributos (ASI)** | ` + detailedComparedClans.value.map(c => c.cla.aumento_atributos_raw).join(' | ') + ` |\n`;
+          md += `| **Deslocamento** | ` + detailedComparedClans.value.map(c => c.cla.deslocamento_formatado).join(' | ') + ` |\n`;
+          md += `| **Perícias** | ` + detailedComparedClans.value.map(c => c.cla.pericias.join(', ') || 'Nenhuma fixa').join(' | ') + ` |\n`;
+          md += `| **Jutsus Exclusivos** | ` + detailedComparedClans.value.map(c => `${c.stats.total_jutsus} (Média ${c.stats.custo_chakra_medio} Chakra)`).join(' | ') + ` |\n`;
+          md += `| **Linhagens Latentes** | ` + detailedComparedClans.value.map(c => `${c.stats.total_latentes} opções`).join(' | ') + ` |\n`;
+          md += `| **Recursos de Clã** | ` + detailedComparedClans.value.map(c => `${c.stats.total_recursos} recursos`).join(' | ') + ` |\n`;
+          navigator.clipboard.writeText(md);
+          alert('Resumo comparativo copiado em Markdown para a área de transferência!');
+        };
+
+        onMounted(async () => {
+          try {
+            const mRes = await fetch('/api/meta/filters');
+            meta.value = await mRes.json();
+            Object.assign(counts, meta.value.contadores);
+          } catch(e) {}
+          fetchJutsus();
+          loadClans();
+          loadClasses();
+          loadEquipment();
+          loadRules();
+          loadCompareSummary();
+          fetchComparedClans();
+        });
+
+        return {
+          currentTab, eqSubTab, viewMode, tabs, counts, meta,
+          jutsuData, jutsuLoading, jFilters, selectedJutsu, modalJutsu,
+          fetchJutsus, debouncedFetchJutsus, toggleFilterList, resetJutsuFilters, setChakraPreset,
+          prevJutsuPage, nextJutsuPage, selectJutsu, openJutsuModal, copyJutsuRule,
+          clansList, activeClan, clanSearch, filteredClans, loadClanDetail,
+          classesList, activeClass, loadClassDetail,
+          weaponsList, armorsList, fuinjutsuList,
+          conditionsList, combatRulesList,
+          clashForm, clashResult, runClashSimulation,
+          getRankBadgeClass, getNatureColor,
+          compareMode, compareSummary, compareLoading, compareSearch,
+          compareFilterAttr, compareFilterSpeed, compareFilterRank, compareFilterStyle, compareFilterLatent,
+          compareSortKey, compareSortAsc, selectedClansForCompare, detailedComparedClans, comparedClansLoading,
+          addClanDropdownValue, loadCompareSummary, fetchComparedClans, toggleClanForCompare,
+          removeClanFromCompare, addClanToCompare, setComparePreset, sortByColumn, filteredCompareClans,
+          getAttrBadgeClass, copyComparisonSummary
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
