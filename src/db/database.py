@@ -1,12 +1,15 @@
 import sqlite3
 import json
+import os
 from typing import List, Optional, Dict, Any
 from src.models.jutsu import Jutsu
 from src.models.clan import Clan
 from src.models.classe import ClassEntity, Archetype, ClassTalent
 from src.models.rules import Weapon, Armor, FuinjutsuSeal, ConditionRule, CombatRule
 
-DEFAULT_DB_PATH = "data/naruto5e.db"
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DEFAULT_DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(PROJECT_ROOT, "data", "naruto5e.db"))
+
 
 
 def get_connection(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
