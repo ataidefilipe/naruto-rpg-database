@@ -193,7 +193,11 @@ O sistema conta com um **Painel Tático Web** de alta performance, projetado esp
   $$\text{Fogo} > \text{Vento} > \text{Relâmpago} > \text{Terra} > \text{Água} > \text{Fogo}$$
   Aplica os bônus numéricos por rank superior (+2 por degrau) e chakra investido, calculando vantagens, testes resistidos e penalidades ao perdedor.
 
-### 🚀 Como Iniciar a Aplicação Web:
+### 🌐 Acesso Online em Produção (Deploy Railway):
+- **Painel Tático Shinobi (SPA):** [https://naruto-rpg-database-production.up.railway.app](https://naruto-rpg-database-production.up.railway.app)
+- **Documentação Swagger OpenAPI:** [https://naruto-rpg-database-production.up.railway.app/docs](https://naruto-rpg-database-production.up.railway.app/docs)
+
+### 🚀 Como Iniciar Localmente:
 
 Execute o comando:
 ```bash
@@ -201,6 +205,7 @@ python run_app.py
 ```
 > O servidor Uvicorn iniciará em `http://127.0.0.1:8000` e seu navegador padrão será aberto automaticamente.
 > A documentação Swagger de todos os endpoints está disponível em [http://localhost:8000/docs](http://localhost:8000/docs).
+
 
 ---
 
