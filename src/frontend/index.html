@@ -43,8 +43,19 @@
         </button>
       </nav>
 
-      <!-- Quick Actions -->
+      <!-- Quick Actions & User Login -->
       <div class="flex items-center gap-2 text-xs">
+        <!-- Status de Login Shinobi -->
+        <div v-if="currentUser" class="flex items-center gap-2 bg-slate-950 border border-amber-500/40 px-2.5 py-1 rounded-lg shadow">
+          <span class="text-amber-400">👤</span>
+          <span class="text-xs text-slate-300">Shinobi: <strong class="text-amber-400">{{ currentUser }}</strong></span>
+          <button @click="openLoginModal" title="Trocar de usuário" class="text-slate-400 hover:text-white text-[11px] underline ml-1">Trocar</button>
+        </div>
+        <button v-else @click="openLoginModal" class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition flex items-center gap-1.5 shadow">
+          <span>🔑</span>
+          <span>Entrar (Login)</span>
+        </button>
+
         <a href="/docs" target="_blank" class="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
           📘 Swagger /docs
         </a>
@@ -346,12 +357,18 @@
                   <!-- Salvaguarda -->
                   <td class="p-2 font-sans text-cyan-400">{{ j.salvaguarda || '—' }}</td>
 
-                  <!-- Detalhes button -->
-                  <td class="p-2 text-center">
+                  <!-- Detalhes e Reportar buttons -->
+                  <td class="p-2 text-center whitespace-nowrap">
                     <button 
                       @click.stop="openJutsuModal(j)" 
                       class="px-2 py-0.5 bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-300 rounded text-[10px] transition">
                       Ver
+                    </button>
+                    <button 
+                      @click.stop="openReportModal('jutsus', j, 'efeito_mecanico')" 
+                      title="Reportar texto quebrado nesta técnica"
+                      class="px-1.5 py-0.5 bg-rose-950/80 hover:bg-rose-800 text-rose-300 border border-rose-800/80 rounded text-[10px] transition ml-1">
+                      ⚠️ Reportar
                     </button>
                   </td>
                 </tr>
@@ -385,7 +402,15 @@
               <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
                 <span class="text-rose-400" v-if="j.dano_formula">{{ j.dano_formula }} {{ j.dano_tipo }}</span>
                 <span class="text-cyan-400" v-if="j.salvaguarda">Save: {{ j.salvaguarda }}</span>
-                <span class="text-slate-500 ml-auto">p.{{ j.pagina }}</span>
+                <div class="flex items-center gap-1.5 ml-auto">
+                  <span class="text-slate-500">p.{{ j.pagina }}</span>
+                  <button 
+                    @click.stop="openReportModal('jutsus', j, 'efeito_mecanico')"
+                    title="Reportar texto quebrado nesta técnica"
+                    class="px-1.5 py-0.5 bg-rose-950/80 hover:bg-rose-800 text-rose-300 border border-rose-800/80 rounded text-[10px] transition">
+                    ⚠️ Reportar
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -447,9 +472,16 @@
                 <h2 class="text-2xl font-bold text-amber-400">CLÃ {{ activeClan.cla.nome.toUpperCase() }}</h2>
                 <p class="text-xs text-slate-400">Estudos da Tsunade (Página {{ activeClan.cla.pagina }})</p>
               </div>
-              <div class="text-right">
-                <span class="text-xs text-slate-400 block">Deslocamento Base</span>
-                <span class="text-sm font-bold text-slate-100">{{ activeClan.cla.deslocamento }}</span>
+              <div class="flex items-center gap-3">
+                <div class="text-right">
+                  <span class="text-xs text-slate-400 block">Deslocamento Base</span>
+                  <span class="text-sm font-bold text-slate-100">{{ activeClan.cla.deslocamento }}</span>
+                </div>
+                <button 
+                  @click="openReportModal('clans', activeClan.cla, 'recursos')"
+                  class="px-2.5 py-1.5 bg-rose-950/80 hover:bg-rose-800 text-rose-300 border border-rose-800 rounded text-xs transition flex items-center gap-1">
+                  ⚠️ Reportar Erro
+                </button>
               </div>
             </div>
 
@@ -555,6 +587,11 @@
                   <span class="block text-slate-400 text-[10px]">Conjuração</span>
                   <span class="text-slate-200 font-bold text-sm">{{ activeClass.classe.tipo_conjurador }}</span>
                 </div>
+                <button 
+                  @click="openReportModal('classes', activeClass.classe, 'caracteristicas_classe')"
+                  class="px-2.5 py-1.5 bg-rose-950/80 hover:bg-rose-800 text-rose-300 border border-rose-800 rounded text-xs transition flex items-center gap-1 self-center">
+                  ⚠️ Reportar Erro
+                </button>
               </div>
             </div>
 
@@ -647,6 +684,7 @@
                 <th class="p-2">Grupo</th>
                 <th class="p-2 text-center">Volume</th>
                 <th class="p-2">Propriedades</th>
+                <th class="p-2 text-center w-12">Ação</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/80 font-mono text-[11px]">
@@ -658,6 +696,11 @@
                 <td class="p-2 font-sans text-slate-300">{{ w.grupo_arma }}</td>
                 <td class="p-2 text-center text-slate-400">{{ w.volume }}</td>
                 <td class="p-2 font-sans text-slate-300">{{ w.propriedades }}</td>
+                <td class="p-2 text-center">
+                  <button @click.stop="openReportModal('weapons', w, 'propriedades')" title="Reportar texto quebrado nesta arma" class="px-1.5 py-0.5 bg-rose-950/80 hover:bg-rose-800 text-rose-300 border border-rose-800/80 rounded text-[10px] transition">
+                    ⚠️
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -675,6 +718,7 @@
                 <th class="p-2">Custo</th>
                 <th class="p-2 text-center">Volume</th>
                 <th class="p-2">Efeito Especial</th>
+                <th class="p-2 text-center w-12">Ação</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/80 font-mono text-[11px]">
@@ -686,6 +730,11 @@
                 <td class="p-2 text-amber-400">{{ a.custo_ryo }}</td>
                 <td class="p-2 text-center text-slate-400">{{ a.volume }}</td>
                 <td class="p-2 font-sans text-slate-300">{{ a.efeito_especial || '—' }}</td>
+                <td class="p-2 text-center">
+                  <button @click.stop="openReportModal('armors', a, 'efeito_especial')" title="Reportar texto quebrado nesta armadura" class="px-1.5 py-0.5 bg-rose-950/80 hover:bg-rose-800 text-rose-300 border border-rose-800/80 rounded text-[10px] transition">
+                    ⚠️
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -702,6 +751,7 @@
                 <th class="p-2">Custo Ryo</th>
                 <th class="p-2">Efeito Mecânico</th>
                 <th class="p-2 text-center">Pág</th>
+                <th class="p-2 text-center w-12">Ação</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/80 font-mono text-[11px]">
@@ -714,6 +764,11 @@
                 <td class="p-2 text-amber-400 font-bold">{{ s.custo_ryo }} Ryo</td>
                 <td class="p-2 font-sans text-slate-300 text-[11px] leading-relaxed">{{ s.efeito_mecanico }}</td>
                 <td class="p-2 text-center text-slate-500">p.{{ s.pagina }}</td>
+                <td class="p-2 text-center">
+                  <button @click.stop="openReportModal('fuinjutsu_seals', s, 'efeito_mecanico')" title="Reportar texto quebrado neste selo" class="px-1.5 py-0.5 bg-rose-950/80 hover:bg-rose-800 text-rose-300 border border-rose-800/80 rounded text-[10px] transition">
+                    ⚠️
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -734,7 +789,10 @@
               <div v-for="c in conditionsList" :key="c.nome" class="bg-slate-900 border border-slate-800 p-3 rounded-lg">
                 <div class="flex justify-between items-center mb-1">
                   <h4 class="font-bold text-slate-100 text-xs">{{ c.nome }}</h4>
-                  <span class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-amber-400">{{ c.categoria }} (p.{{ c.pagina }})</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-amber-400">{{ c.categoria }} (p.{{ c.pagina }})</span>
+                    <button @click.stop="openReportModal('conditions', c, 'descricao_mecanica')" title="Reportar erro nesta condição" class="text-rose-400 hover:text-rose-300 text-xs px-1">⚠️</button>
+                  </div>
                 </div>
                 <p class="text-xs text-slate-300 leading-relaxed">{{ c.descricao_mecanica }}</p>
               </div>
@@ -746,7 +804,12 @@
             <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider mb-3">⚔️ Regras de Combate Shinobi</h3>
             <div class="space-y-3">
               <div v-for="r in combatRulesList" :key="r.chave" class="bg-slate-900 border border-slate-800 p-4 rounded-lg">
-                <h4 class="font-bold text-amber-400 text-sm mb-1">{{ r.titulo }} (p.{{ r.pagina }})</h4>
+                <div class="flex justify-between items-center mb-1">
+                  <h4 class="font-bold text-amber-400 text-sm">{{ r.titulo }} (p.{{ r.pagina }})</h4>
+                  <button @click.stop="openReportModal('combat_rules', r, 'descricao_mecanica')" title="Reportar erro nesta regra" class="px-2 py-0.5 bg-rose-950/80 hover:bg-rose-800 text-rose-300 border border-rose-800/80 rounded text-[11px] transition flex items-center gap-1">
+                    ⚠️ Reportar
+                  </button>
+                </div>
                 <p class="text-xs text-slate-300 leading-relaxed mb-2">{{ r.descricao_mecanica }}</p>
                 <div v-if="r.dados_estruturados" class="bg-slate-950 p-2.5 rounded text-xs font-mono text-slate-400">
                   <pre class="whitespace-pre-wrap">{{ JSON.stringify(r.dados_estruturados, null, 2) }}</pre>
@@ -1379,8 +1442,174 @@
               </div>
             </div>
 
+      <!-- ============================================================== -->
+      <!-- TAB 8: ERROS REPORTADOS (AUDITORIA E CORREÇÃO DE TEXTOS)        -->
+      <!-- ============================================================== -->
+      <div v-show="currentTab === 'reports'" class="flex-1 flex flex-col overflow-hidden bg-slate-950">
+        
+        <!-- Top Toolbar de Relatórios -->
+        <div class="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-md">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">📝</span>
+            <div>
+              <h2 class="font-bold text-amber-400 text-sm">Relatórios de Erros nas Querys & Textos Quebrados</h2>
+              <p class="text-[11px] text-slate-400">Auditoria comunitária, correções de extração e falhas mecânicas</p>
+            </div>
           </div>
 
+          <div class="flex items-center gap-2 text-xs">
+            <button 
+              @click="fetchReports" 
+              class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 flex items-center gap-1 transition">
+              <span>🔄</span> Atualizar
+            </button>
+            <button 
+              @click="openReportModal('geral', { nome: 'Reporte Avulso' }, 'geral')" 
+              class="px-3 py-1.5 bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 rounded font-semibold flex items-center gap-1 transition">
+              <span>➕</span> Novo Reporte Avulso
+            </button>
+          </div>
+        </div>
+
+        <!-- Filtros de Relatórios -->
+        <div class="bg-slate-900/70 border-b border-slate-800 px-4 py-2 flex flex-wrap items-center gap-3 text-xs shrink-0">
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-400 font-medium">Status:</span>
+            <select v-model="reportsFilter.status" @change="fetchReports" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200">
+              <option value="todos">Todos os Status</option>
+              <option value="pendente">⏳ Pendentes</option>
+              <option value="em_analise">🔍 Em Análise</option>
+              <option value="corrigido">✅ Corrigidos</option>
+              <option value="rejeitado">❌ Rejeitados</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-400 font-medium">Tabela:</span>
+            <select v-model="reportsFilter.tabela" @change="fetchReports" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200">
+              <option value="todas">Todas as Tabelas</option>
+              <option value="jutsus">Jutsus</option>
+              <option value="clans">Clãs</option>
+              <option value="classes">Classes</option>
+              <option value="weapons">Armas</option>
+              <option value="armors">Armaduras</option>
+              <option value="fuinjutsu_seals">Selos Fuinjutsu</option>
+              <option value="conditions">Condições</option>
+              <option value="combat_rules">Regras de Combate</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-1 flex-1 max-w-xs">
+            <input 
+              v-model="reportsFilter.q" 
+              @input="debouncedFetchReports"
+              type="text" 
+              placeholder="🔍 Buscar por item, erro ou usuário..." 
+              class="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500">
+          </div>
+
+          <div class="text-slate-400 text-xs ml-auto flex items-center gap-2">
+            <span>Total: <strong class="text-amber-400">{{ reportsData.total }}</strong></span>
+            <span v-if="counts.pending_reports" class="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded text-[10px] font-bold">
+              {{ counts.pending_reports }} pendente{{ counts.pending_reports > 1 ? 's' : '' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Lista de Relatórios -->
+        <div class="flex-1 overflow-auto p-4">
+          <div v-if="reportsData.items.length === 0" class="flex flex-col items-center justify-center h-64 text-slate-500 gap-2">
+            <span class="text-3xl">🎉</span>
+            <p class="text-sm">Nenhum relatório de erro cadastrado com os filtros selecionados.</p>
+            <p class="text-xs text-slate-600">Navegue pelas abas do compêndio e clique no botão ⚠️ Reportar nas linhas para registrar erros.</p>
+          </div>
+
+          <div v-else class="space-y-3 max-w-5xl mx-auto">
+            <div 
+              v-for="rep in reportsData.items" 
+              :key="rep.id"
+              class="bg-slate-900 border rounded-lg p-4 transition shadow"
+              :class="rep.status === 'pendente' ? 'border-amber-500/40 hover:border-amber-500' : (rep.status === 'corrigido' ? 'border-emerald-500/40 hover:border-emerald-500' : 'border-slate-800')">
+              
+              <!-- Header do Card -->
+              <div class="flex items-start justify-between gap-3 border-b border-slate-800 pb-2.5 mb-2.5">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span 
+                    :class="getReportStatusBadge(rep.status)"
+                    class="px-2 py-0.5 rounded text-[10px] font-bold uppercase">
+                    {{ rep.status }}
+                  </span>
+
+                  <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-[10px] font-mono text-cyan-300">
+                    {{ rep.tabela_origem.toUpperCase() }}
+                  </span>
+
+                  <h3 class="font-bold text-sm text-slate-100">{{ rep.item_nome }}</h3>
+                  <span v-if="rep.campo_afetado" class="text-xs text-slate-400">• Campo: <code class="text-amber-300 font-mono">{{ rep.campo_afetado }}</code></span>
+                </div>
+
+                <div class="text-right text-[11px] text-slate-400 shrink-0">
+                  <span>👤 <strong class="text-slate-300">{{ rep.usuario }}</strong></span>
+                  <span class="mx-1.5">•</span>
+                  <span>{{ rep.criado_em }}</span>
+                </div>
+              </div>
+
+              <!-- Conteúdo do Reporte -->
+              <div class="space-y-2 text-xs">
+                <!-- Trecho com erro extraído -->
+                <div v-if="rep.texto_atual" class="bg-slate-950 p-2.5 rounded border border-slate-800/80">
+                  <span class="text-[10px] text-slate-500 uppercase font-semibold block mb-0.5">Texto Atual com Erro:</span>
+                  <p class="font-mono text-[11px] text-slate-400 line-clamp-3 hover:line-clamp-none transition whitespace-pre-wrap">{{ rep.texto_atual }}</p>
+                </div>
+
+                <!-- Descrição do Erro -->
+                <div class="bg-rose-950/20 border border-rose-900/50 p-2.5 rounded text-rose-200">
+                  <span class="text-[10px] text-rose-400 uppercase font-bold block mb-0.5">⚠️ Descrição da Falha / Texto Quebrado:</span>
+                  <p class="whitespace-pre-wrap font-sans">{{ rep.descricao_erro }}</p>
+                </div>
+
+                <!-- Sugestão de Correção -->
+                <div v-if="rep.sugestao_correcao" class="bg-emerald-950/20 border border-emerald-900/50 p-2.5 rounded text-emerald-200">
+                  <span class="text-[10px] text-emerald-400 uppercase font-bold block mb-0.5">💡 Sugestão de Correção:</span>
+                  <p class="whitespace-pre-wrap font-sans">{{ rep.sugestao_correcao }}</p>
+                </div>
+              </div>
+
+              <!-- Rodapé do Card com Ações -->
+              <div class="flex items-center justify-between pt-3 mt-3 border-t border-slate-800/80 text-xs">
+                <span class="text-[11px] text-slate-500 font-mono">Registro #{{ rep.id }}</span>
+                
+                <div class="flex items-center gap-1.5">
+                  <button 
+                    v-if="rep.status !== 'em_analise'"
+                    @click="updateStatus(rep.id, 'em_analise')"
+                    class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-900/50 rounded text-[11px] transition">
+                    🔍 Em Análise
+                  </button>
+                  <button 
+                    v-if="rep.status !== 'corrigido'"
+                    @click="updateStatus(rep.id, 'corrigido')"
+                    class="px-2 py-0.5 bg-emerald-950 hover:bg-emerald-800 text-emerald-300 border border-emerald-800 rounded text-[11px] font-bold transition">
+                    ✅ Corrigido
+                  </button>
+                  <button 
+                    v-if="rep.status !== 'rejeitado'"
+                    @click="updateStatus(rep.id, 'rejeitado')"
+                    class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded text-[11px] transition">
+                    Descartar
+                  </button>
+                  <button 
+                    @click="deleteReport(rep.id)"
+                    title="Excluir relatório"
+                    class="px-2 py-0.5 bg-rose-950/40 hover:bg-rose-900 text-rose-400 rounded text-[11px] transition">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
         </div>
 
       </div>
@@ -1458,14 +1687,240 @@
         <!-- Rodapé do Modal -->
         <div class="flex items-center justify-between pt-2 border-t border-slate-800 text-xs text-slate-400">
           <span>📖 {{ modalJutsu.origem_livro }} (Página {{ modalJutsu.pagina }})</span>
-          <button 
-            @click="copyJutsuRule(modalJutsu)"
-            class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 font-medium rounded transition flex items-center gap-1">
-            📋 Copiar Regra
-          </button>
+          <div class="flex items-center gap-2">
+            <button 
+              @click="openReportModal('jutsus', modalJutsu, 'efeito_mecanico')"
+              class="px-3 py-1.5 bg-rose-950/80 hover:bg-rose-800 border border-rose-800 text-rose-300 font-medium rounded transition flex items-center gap-1.5">
+              ⚠️ Reportar Texto Quebrado
+            </button>
+            <button 
+              @click="copyJutsuRule(modalJutsu)"
+              class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 font-medium rounded transition flex items-center gap-1">
+              📋 Copiar Regra
+            </button>
+          </div>
         </div>
 
       </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- MODAL DE LOGIN SIMPLES (NOME DE USUÁRIO SEM SENHA)             -->
+    <!-- ============================================================== -->
+    <div 
+      v-if="showLoginModal" 
+      @click.self="showLoginModal = false"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-amber-500/40 rounded-xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4">
+        
+        <div class="flex justify-between items-start border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">🍃</span>
+            <div>
+              <h2 class="text-lg font-bold text-amber-400">Identificação Shinobi</h2>
+              <p class="text-xs text-slate-400">Login simples (sem senha) para reportar erros e interagir</p>
+            </div>
+          </div>
+          <button @click="showLoginModal = false" class="text-slate-400 hover:text-white text-lg">✕</button>
+        </div>
+
+        <form @submit.prevent="confirmLogin" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Nome do Shinobi / Usuário</label>
+            <input 
+              v-model="loginInput" 
+              type="text" 
+              required
+              placeholder="Ex: Naruto, Kakashi, Shikamaru, Filipe..."
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-sans"
+            >
+            <p class="text-[11px] text-slate-400 mt-1">Este nome será vinculado aos relatórios de erros que você enviar.</p>
+          </div>
+
+          <!-- Usuários Recentes Sugeridos -->
+          <div v-if="recentUsers.length" class="space-y-1">
+            <span class="text-[10px] text-slate-500 uppercase font-semibold">Shinobis Recentes:</span>
+            <div class="flex flex-wrap gap-1">
+              <button 
+                type="button"
+                v-for="u in recentUsers" 
+                :key="u.id"
+                @click="loginInput = u.username"
+                class="px-2 py-0.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 rounded text-xs transition">
+                {{ u.username }}
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <button 
+              type="button" 
+              v-if="currentUser"
+              @click="logoutUser"
+              class="px-3 py-1.5 text-xs text-rose-400 hover:text-rose-300 hover:underline mr-auto">
+              Sair da conta atual
+            </button>
+            <button 
+              type="button" 
+              @click="showLoginModal = false"
+              class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded transition">
+              Cancelar
+            </button>
+            <button 
+              type="submit" 
+              class="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded transition shadow flex items-center gap-1.5">
+              <span>Entrar</span>
+              <span>⚡</span>
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- MODAL DE REPORTE DE ERRO DE EXTRAÇÃO / TEXTO QUEBRADO          -->
+    <!-- ============================================================== -->
+    <div 
+      v-if="showReportModal" 
+      @click.self="showReportModal = false"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-rose-800/80 rounded-xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl flex flex-col gap-4">
+        
+        <div class="flex justify-between items-start border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl text-rose-400">⚠️</span>
+            <div>
+              <h2 class="text-lg font-bold text-slate-100">Reportar Erro / Texto Quebrado</h2>
+              <p class="text-xs text-slate-400">Ajude a catalogar e corrigir falhas de OCR ou extração mecânica</p>
+            </div>
+          </div>
+          <button @click="showReportModal = false" class="text-slate-400 hover:text-white text-lg">✕</button>
+        </div>
+
+        <form @submit.prevent="submitReport" class="space-y-4 text-xs">
+          <!-- Item Sendo Reportado -->
+          <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 flex justify-between items-center">
+            <div>
+              <span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Item Afetado</span>
+              <h4 class="text-sm font-bold text-amber-400 flex items-center gap-1.5">
+                <span>[{{ reportForm.tabela_origem.toUpperCase() }}]</span>
+                <span>{{ reportForm.item_nome }}</span>
+              </h4>
+            </div>
+            <span v-if="reportForm.item_id" class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">
+              ID: #{{ reportForm.item_id }}
+            </span>
+          </div>
+
+          <!-- Usuário Reportante -->
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">👤 Seu Nome de Shinobi (Usuário):</label>
+            <div class="flex gap-2">
+              <input 
+                v-model="reportForm.usuario" 
+                type="text" 
+                required
+                placeholder="Digite seu nome..." 
+                class="flex-1 bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-amber-500">
+              <button 
+                type="button" 
+                @click="openLoginModal"
+                class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] whitespace-nowrap">
+                Trocar
+              </button>
+            </div>
+          </div>
+
+          <!-- Campo Afetado -->
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-300 mb-1">Campo ou Seção Afetada:</label>
+              <select v-model="reportForm.campo_afetado" class="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-slate-200">
+                <option value="efeito_mecanico">Efeito Mecânico / Descrição</option>
+                <option value="nome">Nome / Título</option>
+                <option value="dano_formula">Dano / Tipo de Dano</option>
+                <option value="custo_chakra">Custo de Chakra / Ryo</option>
+                <option value="tempo_conjuracao">Tempo de Conjuração / Ação</option>
+                <option value="alcance">Alcance / Duração</option>
+                <option value="salvaguarda">Salvaguarda / Condições</option>
+                <option value="upcast">Escalonamento (Upcast)</option>
+                <option value="propriedades">Propriedades / Atributos</option>
+                <option value="outro">Outro / Geral</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-300 mb-1">Tipo de Problema:</label>
+              <select v-model="reportForm.tipo_problema" class="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-slate-200">
+                <option value="texto_quebrado">Caracteres Quebrados / Erro OCR</option>
+                <option value="texto_cortado">Texto Incompleto / Cortado</option>
+                <option value="valor_incorreto">Valor Numérico ou Dado Errado</option>
+                <option value="regra_incompleta">Regra Faltante</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Texto Atual / Trecho com Erro -->
+          <div v-if="reportForm.texto_atual">
+            <label class="block font-semibold text-slate-400 mb-1">Trecho Atual Extraído (Referência):</label>
+            <div class="bg-slate-950 p-2.5 rounded border border-slate-800 text-[11px] text-slate-400 font-mono max-h-24 overflow-y-auto whitespace-pre-wrap">
+              {{ reportForm.texto_atual }}
+            </div>
+          </div>
+
+          <!-- Descrição do Erro -->
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">⚠️ O que está quebrado? Descreva o erro detalhadamente:</label>
+            <textarea 
+              v-model="reportForm.descricao_erro" 
+              required
+              rows="3" 
+              placeholder="Ex: A palavra 'DEESA' veio faltando o F, e na segunda linha a frase corta abruptamente..." 
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"></textarea>
+          </div>
+
+          <!-- Sugestão de Correção -->
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">💡 Sugestão de Correção (Opcional):</label>
+            <textarea 
+              v-model="reportForm.sugestao_correcao" 
+              rows="2" 
+              placeholder="Ex: 'Você foca o seu chakra na última camada de sua pele, fornecendo a você resistência...'" 
+              class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"></textarea>
+          </div>
+
+          <!-- Ações do Modal -->
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <button 
+              type="button" 
+              @click="showReportModal = false"
+              class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition">
+              Cancelar
+            </button>
+            <button 
+              type="submit" 
+              :disabled="reportSubmitting"
+              class="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold rounded transition shadow flex items-center gap-1.5">
+              <span v-if="reportSubmitting">Enviando...</span>
+              <span v-else>Salvar Reporte no Banco 🚀</span>
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TOAST NOTIFICATION FLUTUANTE                                   -->
+    <!-- ============================================================== -->
+    <div 
+      v-if="toast.show" 
+      class="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-2xl border transition-all text-xs font-semibold"
+      :class="toast.type === 'success' ? 'bg-emerald-950 text-emerald-200 border-emerald-700' : 'bg-slate-900 text-slate-200 border-slate-700'">
+      <span>{{ toast.type === 'success' ? '✅' : 'ℹ️' }}</span>
+      <span>{{ toast.message }}</span>
+      <button @click="toast.show = false" class="text-slate-400 hover:text-white ml-2">✕</button>
     </div>
 
   </div>
@@ -1489,11 +1944,12 @@
           { id: 'classes', label: 'Classes & Arquétipos', icon: '🥋', countKey: 'classes' },
           { id: 'equipment', label: 'Equipamentos & Selos', icon: '🗡️', countKey: 'weapons' },
           { id: 'rules', label: 'Regras & Condições', icon: '⚠️', countKey: 'conditions' },
-          { id: 'clash', label: 'Calculadora de Clash', icon: '⚔️', countKey: null }
+          { id: 'clash', label: 'Calculadora de Clash', icon: '⚔️', countKey: null },
+          { id: 'reports', label: 'Erros Reportados', icon: '📝', countKey: 'error_reports' }
         ];
 
         const counts = reactive({
-          jutsus: 1677, clans: 45, classes: 11, weapons: 68, armors: 18, fuinjutsu_seals: 139, conditions: 31
+          jutsus: 1677, clans: 45, classes: 11, weapons: 68, armors: 18, fuinjutsu_seals: 139, conditions: 31, error_reports: 0, pending_reports: 0
         });
 
         const meta = ref({});
@@ -1896,12 +2352,256 @@
           alert('Resumo comparativo copiado em Markdown para a área de transferência!');
         };
 
+        // ==============================================================
+        // SISTEMA DE LOGIN SIMPLES & REPORTE DE ERROS
+        // ==============================================================
+        const currentUser = ref(localStorage.getItem('naruto_shinobi_user') || '');
+        const showLoginModal = ref(false);
+        const loginInput = ref('');
+        const recentUsers = ref([]);
+
+        const openLoginModal = () => {
+          loginInput.value = currentUser.value || '';
+          loadRecentUsers();
+          showLoginModal.value = true;
+        };
+
+        const confirmLogin = async () => {
+          const u = loginInput.value.trim();
+          if (!u || u.length < 2) {
+            alert('Por favor, informe um nome com pelo menos 2 caracteres.');
+            return;
+          }
+          try {
+            const res = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: u })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              currentUser.value = data.username;
+              localStorage.setItem('naruto_shinobi_user', data.username);
+              showLoginModal.value = false;
+              showToast(`Bem-vindo(a), Shinobi ${data.username}!`, 'success');
+              loadRecentUsers();
+            } else {
+              const err = await res.json();
+              alert(err.detail || 'Erro ao realizar login.');
+            }
+          } catch(e) {
+            console.error('Erro de login:', e);
+            currentUser.value = u;
+            localStorage.setItem('naruto_shinobi_user', u);
+            showLoginModal.value = false;
+            showToast(`Logado como ${u}`, 'success');
+          }
+        };
+
+        const logoutUser = () => {
+          currentUser.value = '';
+          localStorage.removeItem('naruto_shinobi_user');
+          showLoginModal.value = false;
+          showToast('Desconectado com sucesso.', 'info');
+        };
+
+        const loadRecentUsers = async () => {
+          try {
+            const res = await fetch('/api/auth/users?limit=10');
+            if (res.ok) {
+              recentUsers.value = await res.json();
+            }
+          } catch(e) {}
+        };
+
+        // Reporte de Erros nas Linhas de Querys
+        const showReportModal = ref(false);
+        const reportSubmitting = ref(false);
+        const reportForm = reactive({
+          usuario: '',
+          tabela_origem: 'jutsus',
+          item_id: null,
+          item_nome: '',
+          campo_afetado: 'efeito_mecanico',
+          tipo_problema: 'texto_quebrado',
+          texto_atual: '',
+          descricao_erro: '',
+          sugestao_correcao: ''
+        });
+
+        const openReportModal = (tabela, item, defaultCampo = 'efeito_mecanico') => {
+          reportForm.usuario = currentUser.value || '';
+          reportForm.tabela_origem = tabela || 'jutsus';
+          reportForm.item_id = item?.id || null;
+          reportForm.item_nome = item?.nome || item?.titulo || item?.nome_habilidade || 'Item Desconhecido';
+          reportForm.campo_afetado = defaultCampo;
+          reportForm.tipo_problema = 'texto_quebrado';
+
+          let previewText = '';
+          if (item) {
+            previewText = item[defaultCampo] || item.efeito_mecanico || item.descricao_mecanica || item.descricao || item.propriedades || item.efeito_especial || '';
+          }
+          reportForm.texto_atual = previewText;
+          reportForm.descricao_erro = '';
+          reportForm.sugestao_correcao = '';
+          showReportModal.value = true;
+        };
+
+        const submitReport = async () => {
+          const user = reportForm.usuario.trim();
+          if (!user) {
+            alert('Por favor, informe seu nome de usuário para registrar o reporte.');
+            return;
+          }
+          if (!reportForm.descricao_erro.trim()) {
+            alert('Por favor, descreva qual o erro encontrado.');
+            return;
+          }
+
+          reportSubmitting.value = true;
+          try {
+            if (!currentUser.value) {
+              currentUser.value = user;
+              localStorage.setItem('naruto_shinobi_user', user);
+            }
+
+            const res = await fetch('/api/reports', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                usuario: user,
+                tabela_origem: reportForm.tabela_origem,
+                item_id: reportForm.item_id,
+                item_nome: reportForm.item_nome,
+                campo_afetado: reportForm.campo_afetado,
+                texto_atual: reportForm.texto_atual || null,
+                descricao_erro: reportForm.descricao_erro,
+                sugestao_correcao: reportForm.sugestao_correcao || null
+              })
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              showReportModal.value = false;
+              showToast(`Relatório #${data.id} salvo no banco com sucesso!`, 'success');
+              counts.error_reports = (counts.error_reports || 0) + 1;
+              counts.pending_reports = (counts.pending_reports || 0) + 1;
+              fetchReports();
+            } else {
+              const err = await res.json();
+              alert(err.detail || 'Erro ao salvar reporte.');
+            }
+          } catch(e) {
+            console.error('Erro ao enviar relatório:', e);
+            alert('Erro ao conectar ao servidor.');
+          } finally {
+            reportSubmitting.value = false;
+          }
+        };
+
+        // Painel de Gestão de Relatórios
+        const reportsData = reactive({ total: 0, items: [] });
+        const reportsFilter = reactive({
+          status: 'todos',
+          tabela: 'todas',
+          q: '',
+          limit: 50,
+          offset: 0
+        });
+
+        const fetchReports = async () => {
+          const params = new URLSearchParams();
+          if (reportsFilter.status && reportsFilter.status !== 'todos') params.append('status', reportsFilter.status);
+          if (reportsFilter.tabela && reportsFilter.tabela !== 'todas') params.append('tabela', reportsFilter.tabela);
+          if (reportsFilter.q) params.append('q', reportsFilter.q);
+          params.append('limit', reportsFilter.limit);
+          params.append('offset', reportsFilter.offset);
+
+          try {
+            const res = await fetch(`/api/reports?${params.toString()}`);
+            if (res.ok) {
+              const data = await res.json();
+              reportsData.total = data.total;
+              reportsData.items = data.items;
+              counts.error_reports = data.total;
+            }
+          } catch(e) {
+            console.error('Erro ao buscar relatórios:', e);
+          }
+        };
+
+        let reportDebounceTimer = null;
+        const debouncedFetchReports = () => {
+          clearTimeout(reportDebounceTimer);
+          reportDebounceTimer = setTimeout(() => {
+            reportsFilter.offset = 0;
+            fetchReports();
+          }, 300);
+        };
+
+        const updateStatus = async (reportId, newStatus) => {
+          try {
+            const res = await fetch(`/api/reports/${reportId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: newStatus })
+            });
+            if (res.ok) {
+              showToast(`Status atualizado para '${newStatus}'.`, 'success');
+              fetchReports();
+            }
+          } catch(e) {
+            console.error('Erro ao atualizar status:', e);
+          }
+        };
+
+        const deleteReport = async (reportId) => {
+          if (!confirm(`Deseja realmente excluir o relatório #${reportId}?`)) return;
+          try {
+            const res = await fetch(`/api/reports/${reportId}`, { method: 'DELETE' });
+            if (res.ok) {
+              showToast(`Relatório #${reportId} excluído.`, 'info');
+              fetchReports();
+            }
+          } catch(e) {
+            console.error('Erro ao excluir relatório:', e);
+          }
+        };
+
+        const getReportStatusBadge = (st) => {
+          switch(st) {
+            case 'pendente': return 'bg-amber-500/20 text-amber-300 border border-amber-500/40';
+            case 'em_analise': return 'bg-blue-500/20 text-blue-300 border border-blue-500/40';
+            case 'corrigido': return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+            case 'rejeitado': return 'bg-rose-500/20 text-rose-300 border border-rose-500/40';
+            default: return 'bg-slate-800 text-slate-300';
+          }
+        };
+
+        // Toast Feedback
+        const toast = reactive({ show: false, message: '', type: 'success' });
+        let toastTimeout = null;
+        const showToast = (message, type = 'success') => {
+          clearTimeout(toastTimeout);
+          toast.message = message;
+          toast.type = type;
+          toast.show = true;
+          toastTimeout = setTimeout(() => {
+            toast.show = false;
+          }, 3500);
+        };
+
         onMounted(async () => {
           try {
             const mRes = await fetch('/api/meta/filters');
             meta.value = await mRes.json();
             Object.assign(counts, meta.value.contadores);
           } catch(e) {}
+          if (currentUser.value) {
+            try {
+              fetch(`/api/auth/me?username=${encodeURIComponent(currentUser.value)}`);
+            } catch(e) {}
+          }
           fetchJutsus();
           loadClans();
           loadClasses();
@@ -1909,6 +2609,8 @@
           loadRules();
           loadCompareSummary();
           fetchComparedClans();
+          fetchReports();
+          loadRecentUsers();
         });
 
         return {
@@ -1927,7 +2629,12 @@
           compareSortKey, compareSortAsc, selectedClansForCompare, detailedComparedClans, comparedClansLoading,
           addClanDropdownValue, loadCompareSummary, fetchComparedClans, toggleClanForCompare,
           removeClanFromCompare, addClanToCompare, setComparePreset, sortByColumn, filteredCompareClans,
-          getAttrBadgeClass, copyComparisonSummary
+          getAttrBadgeClass, copyComparisonSummary,
+          currentUser, showLoginModal, loginInput, recentUsers,
+          openLoginModal, confirmLogin, logoutUser, loadRecentUsers,
+          showReportModal, reportSubmitting, reportForm, openReportModal, submitReport,
+          reportsData, reportsFilter, fetchReports, debouncedFetchReports,
+          updateStatus, deleteReport, getReportStatusBadge, toast, showToast
         };
       }
     }).mount('#app');

@@ -270,4 +270,35 @@ python query.py --regras-combate
 python query.py --regras-combate confronto_clash
 python query.py --regras-combate superioridade_elemental
 python query.py --regras-combate leia_inimigo
+
+# 14. Reporte de Textos Quebrados e Gestão de Erros de Extração
+# Assistente interativo de reporte:
+python query.py --reportar
+
+# Reporte direto com argumentos:
+python query.py --reportar --usuario "Naruto" --tabela "jutsus" --item "Rasengan" --erro "Texto quebrado na linha 2"
+
+# Visualizar todos os erros reportados e seu status:
+python query.py --ver-erros
+
+# Marcar um erro como corrigido no banco:
+python query.py --marcar-corrigido 1
 ```
+
+---
+
+## 🔑 Login Simples & ⚠️ Reporte de Erros de Extração
+
+Como algumas extrações de PDFs complexos sofrem com quebras de OCR ou texto truncado, o sistema inclui uma ferramenta completa de auditoria comunitária:
+
+1. **Login Simples (Sem Senha):**
+   - Basta informar o nome do Shinobi / usuário (ex: `Naruto`, `Kakashi`, `Filipe`).
+   - Sessão salva automaticamente no navegador (`localStorage`) e registrada na tabela `users`.
+   - Permite alternar de conta a qualquer instante no topo da interface.
+
+2. **Reportar Erros Diretamente nas Linhas das Querys:**
+   - **Tabela e Cartões de Jutsus:** Cada linha possui um botão dedicado `⚠️ Reportar` que preenche automaticamente o ID e nome da técnica, permitindo descrever caracteres corrompidos, palavras faltando ou regras incompletas.
+   - **Equipamentos (Armas, Armaduras, Selos):** Botão `⚠️` em cada linha de resultado.
+   - **Clãs, Classes, Condições e Regras:** Botão de reporte em cada ficha mecânica.
+   - **Aba 'Erros Reportados':** Painel completo para listar, filtrar por status (`Pendente`, `Em Análise`, `Corrigido`, `Rejeitado`), buscar termos e gerenciar correções.
+   - **Suporte CLI (`query.py`):** Use `python query.py --reportar` ou `python query.py --ver-erros` diretamente pelo terminal.

@@ -20,6 +20,11 @@ from src.db.database import (
     query_conditions,
     get_combat_rule,
     list_combat_rules,
+    create_error_report,
+    list_error_reports,
+    update_error_report_status,
+    get_or_create_user,
+    ensure_tables,
     DEFAULT_DB_PATH
 )
 
@@ -324,9 +329,102 @@ def display_combat_rules(
     print("=" * 85)
 
 
+def display_error_reports(status: Optional[str] = None, db_path: str = DEFAULT_DB_PATH):
+    """Exibe no terminal a lista de relatórios de erros registrados no banco."""
+    ensure_tables(db_path)
+    data = list_error_reports(status=status, db_path=db_path)
+    total = data["total"]
+    items = data["items"]
+    print(f"\n📝 RELATÓRIOS DE ERROS REGISTRADOS ({total} encontrados):")
+    print("=" * 95)
+    if not items:
+        print("  Nenhum relatório de erro encontrado com os filtros informados.")
+        print("=" * 95)
+        return
+
+    for r in items:
+        status_icon = "⏳" if r['status'] == 'pendente' else ("🔍" if r['status'] == 'em_analise' else "✅")
+        item_id_str = f" [ID: {r['item_id']}]" if r['item_id'] else ""
+        print(f"\n{status_icon} Relatório #{r['id']} | Status: {r['status'].upper()} | Usuário: {r['usuario']} ({r['criado_em']})")
+        print(f"   Origem: [{r['tabela_origem'].upper()}]{item_id_str} {r['item_nome']}")
+        if r['campo_afetado']:
+            print(f"   Campo Afetado: {r['campo_afetado']}")
+        print(f"   ⚠️ Descrição: {r['descricao_erro']}")
+        if r['sugestao_correcao']:
+            print(f"   💡 Correção sugerida: {r['sugestao_correcao']}")
+        print("-" * 95)
+    print("=" * 95)
+
+
+def report_error_interactive(args, db_path: str = DEFAULT_DB_PATH):
+    """Executa o fluxo para reportar erro em texto quebrado (interativo ou via flags)."""
+    ensure_tables(db_path)
+    print("\n" + "=" * 70)
+    print("⚠️  REPORTE DE ERRO DE EXTRAÇÃO / TEXTO QUEBRADO (NARUTO 5E)")
+    print("=" * 70)
+
+    usuario = args.usuario
+    if not usuario:
+        usuario = input("👤 Digite seu nome de Shinobi/Usuário: ").strip()
+    while not usuario:
+        usuario = input("❌ O nome de usuário é obrigatório. Digite seu nome: ").strip()
+
+    get_or_create_user(usuario, db_path=db_path)
+
+    tabela = args.tabela
+    if not tabela:
+        tabela = input("📂 Tabela afetada [jutsus, clans, classes, weapons, armors, selos, regras] (padrão: jutsus): ").strip()
+    if not tabela:
+        tabela = "jutsus"
+
+    item_nome = args.item
+    if not item_nome:
+        item_nome = input("🏷️  Nome ou título do item com texto quebrado (ex: Rasengan): ").strip()
+    while not item_nome:
+        item_nome = input("❌ Nome do item é obrigatório. Digite o nome: ").strip()
+
+    campo = args.campo
+    if campo is None:
+        campo = input("📑 Campo afetado (ex: efeito_mecanico, dano, nome) [Opcional]: ").strip()
+
+    erro = args.erro
+    if not erro:
+        erro = input("✍️  O que está quebrado? Descreva o erro detalhadamente: ").strip()
+    while not erro:
+        erro = input("❌ A descrição do erro é obrigatória: ").strip()
+
+    correcao = args.correcao
+    if correcao is None:
+        correcao = input("💡 Sugestão de texto correto [Opcional]: ").strip()
+
+    report = create_error_report(
+        usuario=usuario,
+        tabela_origem=tabela,
+        item_nome=item_nome,
+        campo_afetado=campo or None,
+        descricao_erro=erro,
+        sugestao_correcao=correcao or None,
+        db_path=db_path
+    )
+    print(f"\n✅ Relatório de erro #{report['id']} gravado com sucesso no banco de dados!")
+    print(f"   Usuário: {report['usuario']} | Origem: [{report['tabela_origem']}] {report['item_nome']}")
+    print("=" * 70 + "\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Consulta rápida no banco de dados Naruto 5e (Jutsus, Clãs, Classes, Equipamentos e Regras)")
-    
+
+    # Autenticação e Reporte de Erros
+    parser.add_argument("--reportar", action="store_true", help="Reportar texto quebrado ou erro em linhas de querys")
+    parser.add_argument("--ver-erros", action="store_true", help="Listar relatórios de erros salvos no banco de dados")
+    parser.add_argument("--marcar-corrigido", type=int, help="Marcar relatório de erro como corrigido pelo seu ID")
+    parser.add_argument("--usuario", type=str, help="Nome do usuário/Shinobi para login e reporte")
+    parser.add_argument("--tabela", type=str, help="Tabela do registro com erro (jutsus, clans, classes, weapons, etc.)")
+    parser.add_argument("--item", type=str, help="Nome do jutsu/item com erro")
+    parser.add_argument("--campo", type=str, help="Campo específico que está com texto quebrado")
+    parser.add_argument("--erro", type=str, help="Descrição detalhada do erro encontrado")
+    parser.add_argument("--correcao", type=str, help="Sugestão de correção para o texto")
+
     # Filtros de Jutsu
     parser.add_argument("--nome", type=str, help="Filtrar por nome do jutsu")
     parser.add_argument("--rank", type=str, help="Filtrar por rank (ex: Rank-D, Rank-C, Rank-B, Rank-A, Rank-S)")
@@ -375,6 +473,23 @@ def main():
     parser.add_argument("--db", type=str, default=DEFAULT_DB_PATH, help="Caminho do banco SQLite")
 
     args = parser.parse_args()
+
+    # 0. Gestão de Relatórios de Erros
+    if args.ver_erros:
+        display_error_reports(db_path=args.db)
+        return
+
+    if args.marcar_corrigido:
+        res = update_error_report_status(args.marcar_corrigido, status="corrigido", db_path=args.db)
+        if res:
+            print(f"\n✅ Relatório #{args.marcar_corrigido} marcado como 'corrigido' com sucesso no banco de dados!")
+        else:
+            print(f"\n❌ Relatório #{args.marcar_corrigido} não encontrado no banco de dados.")
+        return
+
+    if args.reportar:
+        report_error_interactive(args, db_path=args.db)
+        return
 
     # 1. Consulta de Classes
     if args.classes:
@@ -459,7 +574,7 @@ def main():
         display_combat_rules(chave=target_chave, db_path=args.db)
         return
 
-    # 7. Consulta Padrão de Jutsus
+    # 12. Consulta Padrão de Jutsus
     results = query_jutsus(
         nome=args.nome,
         rank=args.rank,
@@ -480,7 +595,7 @@ def main():
         save_tag = f" | Save: {j['salvaguarda']}" if j['salvaguarda'] else ""
         cond_tag = f" | Condição: {', '.join(j['condicoes'])}" if j['condicoes'] else ""
 
-        print(f"{i:3d}. [{j['rank']}] {j['nome']}{cla_tag}")
+        print(f"{i:3d}. [ID: {j['id']}] [{j['rank']}] {j['nome']}{cla_tag}")
         print(f"     Custo: {j['custo_chakra']} Chakra | Ação: {j['tempo_conjuracao']} | Alcance: {j['alcance']}{dano_tag}{save_tag}{cond_tag}")
         if j['vantagem_desvantagem']:
             print(f"     ⚡ {j['vantagem_desvantagem']}")
@@ -492,6 +607,7 @@ def main():
             print("-" * 80)
 
     print("=" * 80)
+    print("💡 Encontrou texto quebrado em alguma linha? Use 'python query.py --reportar' ou use o painel web (http://localhost:8000)!")
 
 
 if __name__ == "__main__":

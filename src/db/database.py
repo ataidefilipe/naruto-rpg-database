@@ -198,6 +198,34 @@ def init_db(db_path: str = DEFAULT_DB_PATH):
     );
     """)
 
+    # 12. Tabela de Usuários (Login simples sem senha)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    # 13. Tabela de Relatórios de Erros nas Linhas de Querys / Extração
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS error_reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario TEXT NOT NULL,
+        tabela_origem TEXT NOT NULL, -- jutsus, clans, classes, weapons, armors, fuinjutsu_seals, conditions, combat_rules
+        item_id INTEGER,
+        item_nome TEXT NOT NULL,
+        campo_afetado TEXT,
+        texto_atual TEXT,
+        descricao_erro TEXT NOT NULL,
+        sugestao_correcao TEXT,
+        status TEXT NOT NULL DEFAULT 'pendente', -- pendente, em_analise, corrigido, rejeitado
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
     # Índices de performance
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_jutsus_rank ON jutsus(rank);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_jutsus_natureza ON jutsus(natureza_estilo);")
@@ -221,6 +249,10 @@ def init_db(db_path: str = DEFAULT_DB_PATH):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_conditions_nome ON conditions(nome);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_conditions_categoria ON conditions(categoria);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_combat_rules_chave ON combat_rules(chave);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_reports_status ON error_reports(status);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_reports_tabela ON error_reports(tabela_origem);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_reports_usuario ON error_reports(usuario);")
 
     conn.commit()
     conn.close()
@@ -981,5 +1013,222 @@ def list_combat_rules(db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
         results.append(d)
     conn.close()
     return results
+
+
+# =====================================================================
+# GESTÃO DE USUÁRIOS (LOGIN SIMPLES SEM SENHA) & RELATÓRIOS DE ERROS
+# =====================================================================
+
+def ensure_tables(db_path: str = DEFAULT_DB_PATH):
+    """Garante que as tabelas de usuários e relatórios de erros existam no banco."""
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS error_reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario TEXT NOT NULL,
+        tabela_origem TEXT NOT NULL,
+        item_id INTEGER,
+        item_nome TEXT NOT NULL,
+        campo_afetado TEXT,
+        texto_atual TEXT,
+        descricao_erro TEXT NOT NULL,
+        sugestao_correcao TEXT,
+        status TEXT NOT NULL DEFAULT 'pendente',
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_reports_status ON error_reports(status);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_reports_tabela ON error_reports(tabela_origem);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_reports_usuario ON error_reports(usuario);")
+    conn.commit()
+    conn.close()
+
+
+def get_or_create_user(username: str, db_path: str = DEFAULT_DB_PATH) -> Dict[str, Any]:
+    """Obtém ou cria um usuário pelo nome (login simples sem senha)."""
+    ensure_tables(db_path)
+    clean_username = username.strip()
+    if not clean_username:
+        raise ValueError("Nome de usuário não pode ser vazio.")
+
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, created_at, last_login FROM users WHERE username = ? COLLATE NOCASE", (clean_username,))
+    row = cursor.fetchone()
+    if row:
+        cursor.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", (row["id"],))
+        conn.commit()
+        cursor.execute("SELECT id, username, created_at, last_login FROM users WHERE id = ?", (row["id"],))
+        updated = dict(cursor.fetchone())
+        conn.close()
+        return updated
+    else:
+        cursor.execute("INSERT INTO users (username) VALUES (?)", (clean_username,))
+        user_id = cursor.lastrowid
+        conn.commit()
+        cursor.execute("SELECT id, username, created_at, last_login FROM users WHERE id = ?", (user_id,))
+        new_user = dict(cursor.fetchone())
+        conn.close()
+        return new_user
+
+
+def list_users(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
+    """Lista usuários registrados com base no último login."""
+    ensure_tables(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, created_at, last_login FROM users ORDER BY last_login DESC LIMIT ?", (limit,))
+    rows = cursor.fetchall()
+    results = [dict(r) for r in rows]
+    conn.close()
+    return results
+
+
+def create_error_report(
+    usuario: str,
+    tabela_origem: str,
+    item_nome: str,
+    descricao_erro: str,
+    item_id: Optional[int] = None,
+    campo_afetado: Optional[str] = None,
+    texto_atual: Optional[str] = None,
+    sugestao_correcao: Optional[str] = None,
+    db_path: str = DEFAULT_DB_PATH
+) -> Dict[str, Any]:
+    """Cria um relatório de erro reportado por um usuário sobre uma linha/registro de query."""
+    ensure_tables(db_path)
+    # Garante que o usuário esteja registrado na tabela users
+    get_or_create_user(usuario, db_path=db_path)
+
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT INTO error_reports (
+        usuario, tabela_origem, item_id, item_nome,
+        campo_afetado, texto_atual, descricao_erro, sugestao_correcao,
+        status, criado_em, atualizado_em
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendente', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    """, (
+        usuario.strip(),
+        tabela_origem.strip().lower(),
+        item_id,
+        item_nome.strip(),
+        campo_afetado.strip() if campo_afetado else None,
+        texto_atual.strip() if texto_atual else None,
+        descricao_erro.strip(),
+        sugestao_correcao.strip() if sugestao_correcao else None
+    ))
+    report_id = cursor.lastrowid
+    conn.commit()
+    cursor.execute("SELECT * FROM error_reports WHERE id = ?", (report_id,))
+    report = dict(cursor.fetchone())
+    conn.close()
+    return report
+
+
+def list_error_reports(
+    status: Optional[str] = None,
+    tabela_origem: Optional[str] = None,
+    usuario: Optional[str] = None,
+    q: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    db_path: str = DEFAULT_DB_PATH
+) -> Dict[str, Any]:
+    """Lista relatórios de erro com filtros por status, tabela e termo de busca."""
+    ensure_tables(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+
+    conditions = ["1=1"]
+    params = []
+
+    if status and status.lower() != "todos":
+        conditions.append("status = ?")
+        params.append(status.lower())
+    if tabela_origem and tabela_origem.lower() != "todas":
+        conditions.append("tabela_origem = ?")
+        params.append(tabela_origem.lower())
+    if usuario:
+        conditions.append("usuario LIKE ?")
+        params.append(f"%{usuario.strip()}%")
+    if q:
+        q_clean = f"%{q.strip()}%"
+        conditions.append("(item_nome LIKE ? OR descricao_erro LIKE ? OR sugestao_correcao LIKE ?)")
+        params.extend([q_clean, q_clean, q_clean])
+
+    where_clause = " AND ".join(conditions)
+    cursor.execute(f"SELECT COUNT(1) FROM error_reports WHERE {where_clause}", params)
+    total = cursor.fetchone()[0]
+
+    cursor.execute(f"""
+        SELECT * FROM error_reports 
+        WHERE {where_clause} 
+        ORDER BY 
+            CASE status 
+                WHEN 'pendente' THEN 1 
+                WHEN 'em_analise' THEN 2 
+                WHEN 'corrigido' THEN 3 
+                ELSE 4 
+            END, 
+            id DESC 
+        LIMIT ? OFFSET ?
+    """, params + [limit, offset])
+    rows = cursor.fetchall()
+    items = [dict(r) for r in rows]
+    conn.close()
+    return {"total": total, "items": items}
+
+
+def get_error_report(report_id: int, db_path: str = DEFAULT_DB_PATH) -> Optional[Dict[str, Any]]:
+    """Busca um relatório de erro específico por ID."""
+    ensure_tables(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM error_reports WHERE id = ?", (report_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_error_report_status(report_id: int, status: str, db_path: str = DEFAULT_DB_PATH) -> Optional[Dict[str, Any]]:
+    """Atualiza o status de um relatório de erro (ex: pendente, em_analise, corrigido, rejeitado)."""
+    ensure_tables(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE error_reports 
+        SET status = ?, atualizado_em = CURRENT_TIMESTAMP 
+        WHERE id = ?
+    """, (status.lower(), report_id))
+    conn.commit()
+    cursor.execute("SELECT * FROM error_reports WHERE id = ?", (report_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def delete_error_report(report_id: int, db_path: str = DEFAULT_DB_PATH) -> bool:
+    """Remove um relatório de erro pelo ID."""
+    ensure_tables(db_path)
+    conn = get_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM error_reports WHERE id = ?", (report_id,))
+    deleted = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
+
 
 

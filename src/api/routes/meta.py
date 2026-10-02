@@ -74,9 +74,12 @@ def get_all_filter_options(db_path: str = DEFAULT_DB_PATH):
 
     # 12. Contadores Globais
     contadores = {}
-    for tbl in ["jutsus", "clans", "latent_bloodlines", "classes", "archetypes", "class_talents", "weapons", "armors", "fuinjutsu_seals", "conditions", "combat_rules"]:
+    for tbl in ["jutsus", "clans", "latent_bloodlines", "classes", "archetypes", "class_talents", "weapons", "armors", "fuinjutsu_seals", "conditions", "combat_rules", "error_reports"]:
         cursor.execute(f"SELECT COUNT(1) FROM {tbl}")
         contadores[tbl] = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(1) FROM error_reports WHERE status = 'pendente'")
+    contadores["pending_reports"] = cursor.fetchone()[0]
 
     conn.close()
 
@@ -106,13 +109,15 @@ def get_all_filter_options(db_path: str = DEFAULT_DB_PATH):
 
 @router.get("/counts", response_model=Dict[str, int])
 def get_table_counts(db_path: str = DEFAULT_DB_PATH):
-    """Retorna a contagem exata e atualizada de registros de todas as 11 tabelas."""
+    """Retorna a contagem exata e atualizada de registros de todas as tabelas."""
     conn = get_connection(db_path)
     cursor = conn.cursor()
     contadores = {}
-    for tbl in ["jutsus", "clans", "latent_bloodlines", "classes", "archetypes", "class_talents", "weapons", "armors", "fuinjutsu_seals", "conditions", "combat_rules"]:
+    for tbl in ["jutsus", "clans", "latent_bloodlines", "classes", "archetypes", "class_talents", "weapons", "armors", "fuinjutsu_seals", "conditions", "combat_rules", "error_reports"]:
         cursor.execute(f"SELECT COUNT(1) FROM {tbl}")
         contadores[tbl] = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(1) FROM error_reports WHERE status = 'pendente'")
+    contadores["pending_reports"] = cursor.fetchone()[0]
     conn.close()
     return contadores
 

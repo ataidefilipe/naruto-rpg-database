@@ -9,12 +9,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from src.api.routes import jutsus, clans, classes, equipment, rules, meta
+from src.api.routes import jutsus, clans, classes, equipment, rules, meta, auth, reports
+from src.db.database import ensure_tables
+
+# Garante criação das tabelas de usuários e erros na inicialização
+ensure_tables()
 
 app = FastAPI(
     title="🍃 Naruto 5e Database API",
-    description="API REST local e analítica com filtros massivos para o sistema Naruto 5e RPG.",
-    version="1.0.0"
+    description="API REST local e analítica com filtros massivos, autenticação simples e reporte de erros para o sistema Naruto 5e RPG.",
+    version="1.1.0"
 )
 
 # CORS totalmente liberado para facilidade de uso pessoal e local
@@ -27,6 +31,8 @@ app.add_middleware(
 )
 
 # Inclusão dos Roteadores da API
+app.include_router(auth.router)
+app.include_router(reports.router)
 app.include_router(meta.router)
 app.include_router(jutsus.router)
 app.include_router(clans.router)
